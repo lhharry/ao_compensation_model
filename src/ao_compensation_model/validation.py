@@ -169,7 +169,7 @@ def plot_results(result: ValidationResult) -> None:
 
     :param result: A :class:`ValidationResult` produced by :func:`reconstruct_phases`.
     """
-    fig, axs = plt.subplots(3, 1, figsize=(14, 12), sharex=True)
+    _, axs = plt.subplots(3, 1, figsize=(14, 12), sharex=True)
     t = result.time_axis
 
     # Panel 1 — Raw kinematics
@@ -223,7 +223,7 @@ def validate(csv_name: str) -> ValidationResult:
     :return: A :class:`ValidationResult` with all computed arrays.
     """
     data = load_test_data(TEST_DATA_DIR / csv_name)
-    x, y, target_sin, target_cos = prepare_features_and_targets(
+    x, _, target_sin, target_cos = prepare_features_and_targets(
         data, MODEL_DIR / "scaler.pkl"
     )
     y_pred = run_tflite_inference(x, MODEL_DIR / "gru_model_optimized.tflite")
