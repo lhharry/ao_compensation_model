@@ -3,8 +3,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from {{ cookiecutter.module_name }}.definitions import LogLevel
-from {{ cookiecutter.module_name }}.utils import setup_logger
+from ao_compensation_model.definitions import LogLevel
+from ao_compensation_model.utils import setup_logger
 
 
 def test_logger_init() -> None:

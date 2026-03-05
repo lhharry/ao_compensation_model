@@ -40,11 +40,11 @@ update-deep:
 	make update
 
 docker:
-	docker build --no-cache -f Dockerfile -t {{ cookiecutter.module_name }}-smoke .
-	docker run --rm {{ cookiecutter.module_name }}-smoke
+	docker build --no-cache -f Dockerfile -t ao_compensation_model-smoke .
+	docker run --rm ao_compensation_model-smoke
 
 app:
-	uv run python -m {{ cookiecutter.module_name }}
+	uv run python -m ao_compensation_model
 
 tree:
 	uv run python repo_tree.py --update-readme

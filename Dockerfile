@@ -8,7 +8,7 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1
 
 # Select the package and version at build time
-ARG PKG={{ cookiecutter.module_name }}
+ARG PKG=ao_compensation_model
 ARG VER=latest
 ENV PKG=${PKG} VER=${VER}
 

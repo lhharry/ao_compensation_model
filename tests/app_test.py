@@ -1,6 +1,6 @@
 """Test the main program."""
 
-from {{ cookiecutter.module_name }}.app import main
+from ao_compensation_model.app import main
 
 
 def test_main():

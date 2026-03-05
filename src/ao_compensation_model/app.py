@@ -2,8 +2,8 @@
 
 import argparse
 
-from {{ cookiecutter.module_name }}.definitions import DEFAULT_LOG_LEVEL, LogLevel
-from {{ cookiecutter.module_name }}.utils import setup_logger
+from ao_compensation_model.definitions import DEFAULT_LOG_LEVEL, LogLevel
+from ao_compensation_model.utils import setup_logger
 from loguru import logger
 
 
