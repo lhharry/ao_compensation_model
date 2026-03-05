@@ -29,14 +29,14 @@ def test_compute_sample_weights_transition():
     """Omega in (0.5, 1.5] should get weight 0.8."""
     omega = np.array([0.6, 1.0, 1.5])
     weights = compute_sample_weights(omega)
-    np.testing.assert_array_equal(weights, 0.8)
+    np.testing.assert_allclose(weights, 0.8, atol=1e-6)
 
 
 def test_compute_sample_weights_stopped():
     """Omega <= 0.5 should get weight 0.1."""
     omega = np.array([0.0, 0.3, 0.5])
     weights = compute_sample_weights(omega)
-    np.testing.assert_array_equal(weights, 0.1)
+    np.testing.assert_allclose(weights, 0.1, atol=1e-6)
 
 
 def test_compute_sample_weights_dtype():

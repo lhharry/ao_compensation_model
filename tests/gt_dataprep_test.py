@@ -52,12 +52,14 @@ def test_prepare_targets_values_bounded():
 
 def test_visualize_does_not_crash():
     """visualize should run without error (with plt.show mocked)."""
+    import matplotlib.pyplot as plt
+
     with TemporaryDirectory() as tmpdir:
         raw = Path(tmpdir) / "raw.csv"
         _make_raw_csv(raw, n=500)
 
-        with patch("ao_compensation_model.gt_dataprep.plt") as mock_plt:
+        with patch.object(plt, "show"):
             from ao_compensation_model.gt_dataprep import visualize
 
             visualize(raw, fs=100)
-            mock_plt.show.assert_called_once()
+            plt.show.assert_called_once()

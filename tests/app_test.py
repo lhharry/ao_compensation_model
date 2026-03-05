@@ -34,12 +34,12 @@ def test_main_prep_command():
 
 def test_main_validate_command():
     """'validate' command should call validate for each test CSV."""
+    mock_test_dir = MagicMock()
+    mock_test_dir.glob.return_value = []
     with (
         patch("ao_compensation_model.app.setup_logger"),
-        patch("ao_compensation_model.validation.validate"),
-        patch(
-            "ao_compensation_model.definitions.TEST_DATA_DIR",
-            new_callable=lambda: MagicMock(glob=MagicMock(return_value=[])),
-        ),
+        patch.dict("ao_compensation_model.app.__builtins__", {}, clear=False),
     ):
-        main(command="validate")
+        # validate is lazily imported inside main(); mock TEST_DATA_DIR at definition site
+        with patch("ao_compensation_model.definitions.TEST_DATA_DIR", mock_test_dir):
+            main(command="validate")
