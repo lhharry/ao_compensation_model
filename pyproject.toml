@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "A GRU model that improves the performance of adaptive oscillators in stop-go and go-stop situations."
 readme = "README.md"
 authors = [
-    { name = "Tony Smoragiewicz", email = "tony.smoragiewicz@tum.de" },
     { name = "Liuhan Huang", email = "liuhan.huang@tum.de" }
 ]
 requires-python = ">=3.11,<3.14"

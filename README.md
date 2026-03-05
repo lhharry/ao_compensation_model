@@ -1,63 +1,77 @@
 # ao_compensation_model
 
-[![Coverage Status](https://coveralls.io/repos/github/TUM-Aries-Lab/ao_compensation_model/badge.svg?branch=main)](https://coveralls.io/github/TUM-Aries-Lab/ao_compensation_model?branch=main)
-![Docker Image CI](https://github.com/TUM-Aries-Lab/ao_compensation_model/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/lhharry/ao_compensation_model/actions/workflows/ci.yml/badge.svg)](https://github.com/lhharry/ao_compensation_model/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/ao-compensation-model)](https://pypi.org/project/ao-compensation-model/)
+[![Docker](https://github.com/lhharry/ao_compensation_model/actions/workflows/docker.yml/badge.svg)](https://github.com/lhharry/ao_compensation_model/actions/workflows/docker.yml)
 
-Simple README.md for a Python project template.
+A GRU-based compensation model that improves the performance of adaptive oscillators (AOs) during stop-go and go-stop gait transitions. The model learns the phase error between the AO output and the ground-truth gait phase, and applies a real-time correction on edge devices via TFLite.
+
+## Pipeline
+
+1. **Data Preparation** (`prep`) — Bandpass-filters raw IMU hip angles, extracts ground-truth gait phase via Hilbert-like analysis, and computes delta-phi training targets.
+2. **Training** (`train`) — Trains a GRU network on sliding windows of AO features, exports to an optimized TFLite model.
+3. **Validation** (`validate`) — Runs frame-by-frame TFLite inference on test data and visualises original AO phase vs. enhanced (AO + GRU) phase vs. ground truth.
 
 ## Install
 
-To install the library from PyPI:
+From PyPI:
 
 ```bash
-uv pip install ao_compensation_model==latest
+pip install ao-compensation-model
 ```
-OR
+
+From source:
+
 ```bash
-uv add git+https://github.com/TUM-Aries-Lab/ao_compensation_model.git@<specific-tag>  # needs credentials
+git clone https://github.com/lhharry/ao_compensation_model.git
+cd ao_compensation_model
+uv sync
 ```
 
 ## Development
-0. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) from Astral.
-1. `git clone git@github.com:TUM-Aries-Lab/ao_compensation_model.git`
-2. `make init` to create the virtual environment and install dependencies
-3. `make format` to format the code and check for errors
-4. `make test` to run the test suite
-5. `make clean` to delete the temporary files and directories
 
+0. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) from Astral.
+1. `git clone git@github.com:lhharry/ao_compensation_model.git`
+2. `make init` — create virtual environment and install dependencies
+3. `make format` — format code and run type checks
+4. `make test` — run the test suite with coverage
+5. `make clean` — delete temporary files and directories
+
+## Usage
+
+### As a CLI
+
+```bash
+# Prepare ground-truth targets from raw CSVs
+uv run python -m ao_compensation_model prep
+
+# Train the GRU model
+uv run python -m ao_compensation_model train
+
+# Validate on test data
+uv run python -m ao_compensation_model validate
+```
+
+### As a library
+
+```python
+from ao_compensation_model.training import build_gru_model, compute_sample_weights
+from ao_compensation_model.utils import bandpass_filter, extract_true_phase
+from ao_compensation_model.validation import validate
+```
 
 ## Publishing
-It's super easy to publish your own packages on PyPI. To build and publish this package run:
+
+Pushing a version tag triggers automatic publishing to PyPI via GitHub Actions (Trusted Publishing):
 
 ```bash
-uv build
-uv publish  # make sure your version in pyproject.toml is updated
-```
-The package can then be found at: https://pypi.org/project/ao_compensation_model
-
-## Module Usage
-```python
-"""Basic docstring for my module."""
-
-from loguru import logger
-
-from ao_compensation_model import definitions
-
-def main() -> None:
-    """Run a simple demonstration."""
-    logger.info("Hello World!")
-
-if __name__ == "__main__":
-    main()
-```
-
-## Program Usage
-```bash
-uv run python -m ao_compensation_model
+# Update version in pyproject.toml, then:
+git tag v0.1.1
+git push origin --tags
 ```
 
 ## Structure
-The following tree shows the important permanent files. Run `make tree` to update.
+
 <!-- TREE-START -->
 ```
 ├── src
@@ -66,23 +80,25 @@ The following tree shows the important permanent files. Run `make tree` to updat
 │       ├── __main__.py
 │       ├── app.py
 │       ├── definitions.py
-│       └── utils.py
+│       ├── gt_dataprep.py
+│       ├── training.py
+│       ├── utils.py
+│       ├── validation.py
+│       ├── dataset/
+│       └── model/
 ├── tests
 │   ├── __init__.py
 │   ├── conftest.py
 │   ├── app_test.py
+│   ├── gt_dataprep_test.py
+│   ├── training_test.py
 │   └── utils_test.py
-├── .dockerignore
-├── .gitignore
-├── .pre-commit-config.yaml
-├── .python-version
+├── .github/workflows/
 ├── CONTRIBUTING.md
 ├── Dockerfile
 ├── LICENSE
 ├── Makefile
 ├── README.md
-├── pyproject.toml
-├── repo_tree.py
-└── uv.lock
+└── pyproject.toml
 ```
 <!-- TREE-END -->
