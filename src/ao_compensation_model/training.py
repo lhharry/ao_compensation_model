@@ -70,17 +70,17 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarr
     """
     df = pd.read_csv(csv_path, sep=";")
 
-    raw_angle = df["Hip_x"].values
-    ao_gait_phase = df["Hip_x_ao"].values
-    angular_velocity = df["Hip_x_vel"].values
-    omega = df["Hip_x_omega"].values
-    domega = np.clip(df["Hip_x_domega"].values, -20.0, 20.0)
+    raw_angle = np.asarray(df["Hip_x"].values)
+    ao_gait_phase = np.asarray(df["Hip_x_ao"].values)
+    angular_velocity = np.asarray(df["Hip_x_vel"].values)
+    omega = np.asarray(df["Hip_x_omega"].values)
+    domega = np.clip(np.asarray(df["Hip_x_domega"].values), -20.0, 20.0)
 
     ao_phase_sin = np.sin(ao_gait_phase)
     ao_phase_cos = np.cos(ao_gait_phase)
 
-    target_sin = df["target_sin"].values
-    target_cos = df["target_cos"].values
+    target_sin = np.asarray(df["target_sin"].values)
+    target_cos = np.asarray(df["target_cos"].values)
     targets = np.column_stack([target_sin, target_cos])
 
     features = np.column_stack(
@@ -140,7 +140,7 @@ def train():
     # --- Create sliding windows per file, then merge ---
     x_list, y_list, w_list = [], [], []
     for features, targets, omega in file_data:
-        features_scaled = scaler.transform(features)
+        features_scaled = np.asarray(scaler.transform(features))
         x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE)
         if len(x_file) == 0:
             continue

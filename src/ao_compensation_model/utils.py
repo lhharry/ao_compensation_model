@@ -34,7 +34,10 @@ class RealTimeBandpassFilter:
         nyq = 0.5 * fs
         low = lowcut / nyq
         high = highcut / nyq
-        self.b, self.a = butter(order, [low, high], btype="band")
+        coeffs = butter(order, [low, high], btype="band")
+        assert coeffs is not None
+        self.b: np.ndarray = np.asarray(coeffs[0])
+        self.a: np.ndarray = np.asarray(coeffs[1])
         self.zi = lfilter_zi(self.b, self.a)
         self.is_initialized = False
 
@@ -69,8 +72,9 @@ def bandpass_filter(
     nyq = 0.5 * fs
     low = lowcut / nyq
     high = highcut / nyq
-    b, a = butter(order, [low, high], btype="band")
-    return filtfilt(b, a, data)
+    coeffs = butter(order, [low, high], btype="band")
+    assert coeffs is not None
+    return np.asarray(filtfilt(coeffs[0], coeffs[1], data))
 
 
 # ---------------------------------------------------------------------------

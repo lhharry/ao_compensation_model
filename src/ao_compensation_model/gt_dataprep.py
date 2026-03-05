@@ -30,8 +30,8 @@ def prepare_targets(input_path, output_path, fs=SAMPLING_FREQ):
     """
     df = pd.read_csv(input_path, sep=";")
 
-    raw_hip_angle = df["Hip_x"].values
-    ao_gait_phase = df["Hip_x_ao"].values
+    raw_hip_angle = np.asarray(df["Hip_x"].values)
+    ao_gait_phase = np.asarray(df["Hip_x_ao"].values)
     ao_cos = np.cos(ao_gait_phase)
     ao_sin = np.sin(ao_gait_phase)
 
@@ -60,8 +60,8 @@ def visualize(input_path, fs=SAMPLING_FREQ):
     df = pd.read_csv(input_path, sep=";")
 
     t = pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
-    raw_hip_angle = df["Hip_x"].values
-    ao_gait_phase = df["Hip_x_ao"].values
+    raw_hip_angle = np.asarray(df["Hip_x"].values)
+    ao_gait_phase = np.asarray(df["Hip_x_ao"].values)
     ao_cos = np.cos(ao_gait_phase)
     ao_sin = np.sin(ao_gait_phase)
 

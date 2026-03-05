@@ -7,11 +7,12 @@ between original AO phase, enhanced (AO + GRU) phase, and ground truth.
 from dataclasses import dataclass
 from pathlib import Path
 
-import ai_edge_litert.interpreter as tflite
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+import ai_edge_litert.interpreter as tflite  # type: ignore[import-untyped]
 
 from ao_compensation_model.definitions import (
     MODEL_DIR,
@@ -55,12 +56,12 @@ def load_test_data(csv_path: Path) -> dict[str, np.ndarray]:
     """
     df = pd.read_csv(csv_path, sep=";")
     return {
-        "raw_angle": df["Hip_x"].values,
-        "ao_gait_phase": df["Hip_x_ao"].values,
-        "angular_velocity": df["Hip_x_vel"].values,
-        "omega": df["Hip_x_omega"].values,
-        "domega": df["Hip_x_domega"].values,
-        "pred_gp": df["Hip_x_gp"].values,
+        "raw_angle": np.asarray(df["Hip_x"].values),
+        "ao_gait_phase": np.asarray(df["Hip_x_ao"].values),
+        "angular_velocity": np.asarray(df["Hip_x_vel"].values),
+        "omega": np.asarray(df["Hip_x_omega"].values),
+        "domega": np.asarray(df["Hip_x_domega"].values),
+        "pred_gp": np.asarray(df["Hip_x_gp"].values),
     }
 
 

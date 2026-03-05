@@ -39,7 +39,7 @@ def main(
         logger.success("Training complete.")
 
     elif command == "validate":
-        from ao_compensation_model.validation_lite import validate
+        from ao_compensation_model.validation import validate
         from ao_compensation_model.definitions import TEST_DATA_DIR
 
         logger.info("Running validation on test data...")
