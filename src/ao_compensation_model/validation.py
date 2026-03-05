@@ -57,16 +57,14 @@ def validate(csv_name: str):
     x, y = create_sliding_windows(features_scaled, gru_targets, WINDOW_SIZE, stride=1)
     x = x.astype(np.float32)
     y = y.astype(np.float32)
-    print(f"Test input shape: {x.shape}")
+    #print(f"Test input shape: {x.shape}")
 
     # --- TFLite inference (frame-by-frame) ---
-    print("Loading TFLite model...")
     interpreter = tflite.Interpreter(model_path=str(model_path))
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    print("Running frame-by-frame inference...")
     y_pred_list = []
     for i in range(len(x)):
         interpreter.set_tensor(input_details[0]["index"], x[i : i + 1])

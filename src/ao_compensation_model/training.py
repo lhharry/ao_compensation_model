@@ -164,8 +164,8 @@ def train():
     idx = np.random.permutation(len(x))
     x, y, w = x[idx], y[idx], w[idx]
 
-    print(f"Loaded {len(csv_files)} CSV files")
-    print(f"Input shape: {x.shape}, Target shape: {y.shape}")
+    #print(f"Loaded {len(csv_files)} CSV files")
+    #print(f"Input shape: {x.shape}, Target shape: {y.shape}")
 
     # --- Train ---
     model = build_gru_model(WINDOW_SIZE, x.shape[2])
@@ -208,7 +208,7 @@ def train():
     with open(tflite_path, "wb") as f:
         f.write(tflite_model)
 
-    print(f"Saved optimized TFLite model to: {tflite_path}")
+    #print(f"Saved optimized TFLite model to: {tflite_path}")
 
 
 if __name__ == "__main__":

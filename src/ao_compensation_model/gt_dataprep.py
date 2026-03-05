@@ -71,7 +71,7 @@ def visualize(input_path, fs=SAMPLING_FREQ):
     tp_sin = np.sin(true_phase)
     gru_targets = generate_gru_targets(tp_cos, tp_sin, ao_cos, ao_sin)
 
-    fig, axs = plt.subplots(4, 1, figsize=(14, 12), sharex=True)
+    _, axs = plt.subplots(4, 1, figsize=(14, 12), sharex=True)
 
     axs[0].set_title("Step 1: Raw Kinematics vs Filtered Signal")
     axs[0].plot(t, raw_hip_angle, label="Raw Hip Angle", color="gray", alpha=0.6)
@@ -123,4 +123,4 @@ if __name__ == "__main__":
     output_file = TRAINING_DATA_DIR / f"{csv_name}_target.csv"
 
     prepare_targets(input_file, output_file)
-    visualize(input_file)
+    visualize(output_file)

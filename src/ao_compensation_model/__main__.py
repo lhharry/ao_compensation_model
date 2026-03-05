@@ -1,16 +1,17 @@
-"""Sample doc string."""
+"""CLI entry point: python -m ao_compensation_model <command>."""
 
 import argparse
 
-from loguru import logger
-
 from ao_compensation_model.app import main
 from ao_compensation_model.definitions import DEFAULT_LOG_LEVEL, LogLevel
-from ao_compensation_model.utils import setup_logger
-
 
 if __name__ == "__main__":  # pragma: no cover
-    parser = argparse.ArgumentParser("Run the pipeline.")
+    parser = argparse.ArgumentParser("ao_compensation_model pipeline")
+    parser.add_argument(
+        "command",
+        choices=["prep", "train", "validate"],
+        help="Pipeline step to run: prep | train | validate",
+    )
     parser.add_argument(
         "--log-level",
         default=DEFAULT_LOG_LEVEL,
@@ -23,10 +24,14 @@ if __name__ == "__main__":  # pragma: no cover
         "--stderr-level",
         default=DEFAULT_LOG_LEVEL,
         choices=list(LogLevel()),
-        help="Set the std err level.",
+        help="Set the stderr level.",
         required=False,
         type=str,
     )
     args = parser.parse_args()
 
-    main(log_level=args.log_level, stderr_level=args.stderr_level)
+    main(
+        command=args.command,
+        log_level=args.log_level,
+        stderr_level=args.stderr_level,
+    )
