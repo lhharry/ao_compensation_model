@@ -1,6 +1,6 @@
 [project]
 name = "ao_compensation_model"
-version = "0.1.0"
+version = "0.1.1"
 description = "A GRU model that improves the performance of adaptive oscillators in stop-go and go-stop situations."
 readme = "README.md"
 authors = [
