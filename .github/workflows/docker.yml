@@ -59,14 +59,23 @@ jobs:
         run: |
           REF="${GITHUB_REF#refs/}"
           SHA_TAG=${GITHUB_SHA::12}
+          IMAGE="${{ env.REGISTRY }}/$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')"
+          TAGS="${IMAGE}:${SHA_TAG}"
           echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
           if [[ "$REF" == tags/v* ]]; then
             V="${REF#tags/v}"
-            echo "version_tag=${V}" >> "$GITHUB_OUTPUT"
+            TAGS="${TAGS}
+          ${IMAGE}:${V}"
           fi
           if [[ "$REF" == heads/main ]]; then
-            echo "latest_tag=latest" >> "$GITHUB_OUTPUT"
+            TAGS="${TAGS}
+          ${IMAGE}:latest"
           fi
+          {
+            echo "tags<<EOF"
+            echo "$TAGS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build (branch) — fast single-arch, no push
         if: env.IS_MAIN != 'true' && env.IS_TAG != 'true' && env.MULTIARCH_ON_BRANCHES != 'true'
@@ -80,8 +89,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.image_name_lc }}:${{ steps.meta.outputs.sha_tag }}
+          tags: ${{ steps.meta.outputs.tags }}
 
       - name: Build & push (multi-arch)
         if: env.IS_MAIN == 'true' || env.IS_TAG == 'true' || env.MULTIARCH_ON_BRANCHES == 'true'
@@ -94,13 +102,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
-          tags: |
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.image_name_lc }}:${{ steps.meta.outputs.sha_tag }}
-
-            ${{ steps.meta.outputs.version_tag }}
-
-            
-            ${{ steps.meta.outputs.latest_tag }}
+          tags: ${{ steps.meta.outputs.tags }}
 
 
       - name: Smoke test (branch image)
