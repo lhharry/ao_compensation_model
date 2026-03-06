@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from loguru import logger
-from scipy.signal import butter, filtfilt, lfilter, lfilter_zi
+from scipy.signal import butter, filtfilt, find_peaks, lfilter, lfilter_zi
 
 from ao_compensation_model.definitions import (
     BANDPASS_HIGHCUT,
@@ -89,7 +89,7 @@ def extract_true_phase(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Extract ground-truth gait phase from a bandpass-filtered signal.
 
-    A triangle wave is constructed between successive signal troughs.
+    A triangle wave is constructed between successive signal peaks.
     Portions where the RMS amplitude envelope falls below *threshold*
     are clamped to zero (stationary detection).
 
@@ -99,14 +99,14 @@ def extract_true_phase(
     :param window_time: Window length (seconds) for the RMS envelope.
     :return: (triangle_wave, amplitude_envelope) arrays.
     """
-    # Detect local troughs (minima below zero)
-    troughs = np.where(np.diff(np.sign(np.diff(filtered_signal))) > 0)[0] + 1
-    troughs = troughs[filtered_signal[troughs] < 0]
+    # Minimum peak spacing: half a cycle at the bandpass high-cutoff frequency
+    min_distance = int(0.99 / (BANDPASS_HIGHCUT * dt))
+    peak, _ = find_peaks(filtered_signal, height=0, distance=min_distance)
 
-    # Build triangle wave from trough to trough, spanning [-pi, pi]
+    # Build triangle wave from peak to peak, spanning [-pi, pi]
     triangle_wave = np.zeros_like(filtered_signal)
-    for i in range(len(troughs) - 1):
-        start, end = troughs[i], troughs[i + 1]
+    for i in range(len(peak) - 1):
+        start, end = peak[i], peak[i + 1]
         triangle_wave[start:end] = np.linspace(-np.pi, np.pi, end - start)
 
     # RMS amplitude envelope via moving average of squared signal
@@ -126,22 +126,16 @@ def extract_true_phase(
 def generate_gru_targets(
     tp_cos: np.ndarray,
     tp_sin: np.ndarray,
-    ao_cos: np.ndarray,
-    ao_sin: np.ndarray,
 ) -> np.ndarray:
-    """Compute GRU training targets as the phase difference (delta-phi).
-
-    The phase difference between the true phase and the AO phase is
-    decomposed into cosine and sine components.
+    """Compute GRU training targets to cos and sin.
+    The true phase is decomposed into cosine and sine components.
 
     :param tp_cos: Cosine of the true phase.
     :param tp_sin: Sine of the true phase.
-    :param ao_cos: Cosine of the AO phase.
-    :param ao_sin: Sine of the AO phase.
     :return: Array of shape (N, 2) with columns [target_cos, target_sin].
     """
-    target_cos = tp_cos * ao_cos + tp_sin * ao_sin
-    target_sin = tp_sin * ao_cos - tp_cos * ao_sin
+    target_cos = tp_cos
+    target_sin = tp_sin
     return np.column_stack([target_cos, target_sin])
 
 

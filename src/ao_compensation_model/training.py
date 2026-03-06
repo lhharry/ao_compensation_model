@@ -117,7 +117,7 @@ def build_gru_model(
 def train():
     """Run the full training pipeline: load data, train, and export TFLite."""
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODEL_DIR / "gru_model_residual.h5"
+    model_path = MODEL_DIR / "gru_model.h5"
     scaler_path = MODEL_DIR / "scaler.pkl"
     tflite_path = MODEL_DIR / "gru_model_optimized.tflite"
 
