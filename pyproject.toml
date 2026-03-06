@@ -72,6 +72,9 @@ lint.ignore = [
   "D107","PLR2004","S607","S605","S603", "S311", "PLC0415"
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"src/ao_compensation_model/txt2csv.py" = ["T201"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["ao_compensation_model"]
 combine-as-imports = true
