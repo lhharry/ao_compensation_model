@@ -60,9 +60,10 @@ wheels = [
 
 [[package]]
 name = "ao-compensation-model"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
+    { name = "ai-edge-litert" },
     { name = "joblib" },
     { name = "loguru" },
     { name = "matplotlib" },
@@ -88,6 +89,7 @@ hw = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ai-edge-litert", specifier = ">=2.1.2" },
     { name = "ai-edge-litert", marker = "extra == 'hw'", specifier = ">=1.2" },
     { name = "coveralls", marker = "extra == 'dev'", specifier = ">=4.0.1" },
     { name = "joblib", specifier = ">=1.4" },

@@ -8,9 +8,12 @@ A GRU-based compensation model that improves the performance of adaptive oscilla
 
 ## Pipeline
 
-1. **Data Preparation** (`prep`) — Bandpass-filters raw IMU hip angles, extracts ground-truth gait phase via Hilbert-like analysis, and computes delta-phi training targets.
-2. **Training** (`train`) — Trains a GRU network on sliding windows of AO features, exports to an optimized TFLite model.
-3. **Validation** (`validate`) — Runs frame-by-frame TFLite inference on test data and visualises original AO phase vs. enhanced (AO + GRU) phase vs. ground truth.
+| Step | Command | Description |
+|------|---------|-------------|
+| 1 | `prep` | Bandpass-filters raw IMU hip angles, extracts ground-truth gait phase, and computes delta-phi training targets. |
+| 2 | `train` | Trains a GRU network on sliding windows of AO features and exports an optimized TFLite model. |
+| 3 | `validate` | Runs frame-by-frame TFLite inference on test data and visualises AO phase vs. enhanced phase vs. ground truth. |
+| 4 | `txt2csv` | Converts raw sensor text files (tab / comma / semicolon delimited) in a folder to semicolon-delimited CSVs. |
 
 ## Install
 
@@ -28,6 +31,72 @@ cd ao_compensation_model
 uv sync
 ```
 
+## Usage
+
+### CLI
+
+All commands follow the pattern:
+
+```bash
+uv run python -m ao_compensation_model <command> [options]
+```
+
+#### Data Preparation
+
+```bash
+# Prepare ground-truth targets from all raw CSVs
+uv run python -m ao_compensation_model prep
+
+# Prepare a single file
+uv run python -m ao_compensation_model prep --file 20260304_17_13_22_stopgo.csv
+
+# Prepare with a custom stationary threshold (default: 0.083)
+uv run python -m ao_compensation_model prep --file recording.csv --threshold 0.1
+```
+
+#### Training
+
+```bash
+uv run python -m ao_compensation_model train
+```
+
+#### Validation
+
+```bash
+# Validate all test files
+uv run python -m ao_compensation_model validate
+
+# Validate a specific test file
+uv run python -m ao_compensation_model validate --file 20260304_14_26_34_4km_stopgo.csv
+```
+
+#### File Conversion
+
+```bash
+# Opens a folder picker GUI
+uv run python -m ao_compensation_model txt2csv
+
+# Convert a specific folder
+uv run python -m ao_compensation_model txt2csv --file /path/to/folder
+```
+
+### CLI Flags
+
+| Flag | Applies to | Description |
+|------|------------|-------------|
+| `--file` | `prep`, `validate`, `txt2csv` | `prep`: single CSV to process. `validate`: single test CSV. `txt2csv`: folder path. |
+| `--threshold` | `prep` | Amplitude threshold for stationary detection (default: `0.083`). |
+| `--log-level` | all | Log level (`TRACE`, `DEBUG`, `INFO`, `SUCCESS`, `WARNING`, `ERROR`, `CRITICAL`). |
+| `--stderr-level` | all | Stderr log level. |
+
+### As a Library
+
+```python
+from ao_compensation_model.training import build_gru_model, compute_sample_weights
+from ao_compensation_model.utils import bandpass_filter, extract_true_phase
+from ao_compensation_model.validation import validate
+```
+
 ## Development
 
 0. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) from Astral.
@@ -36,42 +105,6 @@ uv sync
 3. `make format` — format code and run type checks
 4. `make test` — run the test suite with coverage
 5. `make clean` — delete temporary files and directories
-
-## Usage
-
-### As a CLI
-
-```bash
-# Prepare ground-truth targets from all raw CSVs
-uv run python -m ao_compensation_model prep
-
-# Prepare a single CSV file
-uv run python -m ao_compensation_model prep --file 20260304_17_13_22_stopgo.csv
-
-# Prepare with a custom stationary threshold (default: 0.083)
-uv run python -m ao_compensation_model prep --file recording.csv --threshold 0.1
-
-# Train the GRU model
-uv run python -m ao_compensation_model train
-
-# Validate on test data
-uv run python -m ao_compensation_model validate
-```
-
-| Flag | Applies to | Description |
-|------|-----------|-------------|
-| `--file` | `prep` | Process a single CSV instead of all files in `raw/`. Accepts a filename, relative, or absolute path. |
-| `--threshold` | `prep` | Amplitude threshold for stationary detection (default `0.083`). |
-| `--log-level` | all | Set the log level (`TRACE`, `DEBUG`, `INFO`, …). |
-| `--stderr-level` | all | Set the stderr level. |
-
-### As a library
-
-```python
-from ao_compensation_model.training import build_gru_model, compute_sample_weights
-from ao_compensation_model.utils import bandpass_filter, extract_true_phase
-from ao_compensation_model.validation import validate
-```
 
 ## Publishing
 
@@ -86,6 +119,7 @@ git push origin --tags
 ## Structure
 
 <!-- TREE-START -->
+
 ```
 ├── src
 │   └── ao_compensation_model
@@ -95,6 +129,7 @@ git push origin --tags
 │       ├── definitions.py
 │       ├── gt_dataprep.py
 │       ├── training.py
+│       ├── txt2csv.py
 │       ├── utils.py
 │       ├── validation.py
 │       ├── dataset/
@@ -114,4 +149,5 @@ git push origin --tags
 ├── README.md
 └── pyproject.toml
 ```
+
 <!-- TREE-END -->

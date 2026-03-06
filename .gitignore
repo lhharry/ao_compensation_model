@@ -170,3 +170,6 @@ cython_debug/
 *.egg-info
 
 /logs/log_*
+
+src/ao_compensation_model/dataset/
+src/ao_compensation_model/model/

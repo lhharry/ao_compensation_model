@@ -9,8 +9,8 @@ if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser("ao_compensation_model pipeline")
     parser.add_argument(
         "command",
-        choices=["prep", "train", "validate"],
-        help="Pipeline step to run: prep | train | validate",
+        choices=["prep", "train", "validate", "txt2csv"],
+        help="Pipeline step to run: prep | train | validate | txt2csv",
     )
     parser.add_argument(
         "--file",

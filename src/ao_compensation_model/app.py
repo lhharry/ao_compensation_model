@@ -27,7 +27,7 @@ def main(
     setup_logger(log_level=log_level, stderr_level=stderr_level)
 
     if command == "prep":
-        from ao_compensation_model.gt_dataprep import prepare_targets
+        from ao_compensation_model.gt_dataprep import prepare_targets, visualize
         from ao_compensation_model.definitions import RAW_DATA_DIR, TRAINING_DATA_DIR
 
         logger.info(f"Stationary threshold: {threshold}")
@@ -47,6 +47,7 @@ def main(
         for csv_file in csv_files:
             out = TRAINING_DATA_DIR / f"{csv_file.stem}_target.csv"
             prepare_targets(csv_file, out, threshold=threshold)
+            visualize(out, threshold=threshold)
             logger.info(f"  {csv_file.name} -> {out.name}")
         logger.success("Data preparation complete.")
 
@@ -61,11 +62,43 @@ def main(
         from ao_compensation_model.validation import validate
         from ao_compensation_model.definitions import TEST_DATA_DIR
 
+        if file is not None:
+            csv_path = Path(file)
+            if not csv_path.suffix:
+                csv_path = csv_path.with_suffix(".csv")
+            csv_files = [csv_path.name if csv_path.is_absolute() else str(csv_path)]
+        else:
+            csv_files = [f.name for f in sorted(TEST_DATA_DIR.glob("*.csv"))]
+
         logger.info("Running validation on test data...")
-        for csv_file in sorted(TEST_DATA_DIR.glob("*.csv")):
-            logger.info(f"  Validating: {csv_file.name}")
-            validate(csv_file.name)
+        for name in csv_files:
+            logger.info(f"  Validating: {name}")
+            validate(name)
         logger.success("Validation complete.")
 
+    elif command == "txt2csv":
+        from ao_compensation_model.txt2csv import convert_folder_to_csv
+
+        if file is not None:
+            folder = str(Path(file).resolve())
+        else:
+            import tkinter as tk
+            from tkinter import filedialog
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            folder = filedialog.askdirectory(
+                title="Select Folder Containing Sensor Files"
+            )
+            root.destroy()
+
+        if folder:
+            logger.info(f"Converting files in: {folder}")
+            convert_folder_to_csv(folder)
+            logger.success("Conversion complete.")
+        else:
+            logger.warning("No folder selected. Cancelled.")
+
     else:
-        logger.error(f"Unknown command: '{command}'. Use 'prep', 'train', or 'validate'.")
+        logger.error(f"Unknown command: '{command}'. Use 'prep', 'train', 'validate', or 'txt2csv'.")
