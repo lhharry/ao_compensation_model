@@ -81,33 +81,53 @@ def bandpass_filter(
 # ---------------------------------------------------------------------------
 
 
-def extract_true_phase(
+def align_ao_phase(
     filtered_signal: np.ndarray,
+    ao_phase: np.ndarray,
     dt: float = 1 / SAMPLING_FREQ,
     threshold: float = STATIONARY_THRESHOLD,
-    window_time: float = 0.5,
+    window_time: float = 1,
+    ao_error_threshold: float = 1.5,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Extract ground-truth gait phase from a bandpass-filtered signal.
+    """Align AO phase to Hip_x peaks, falling back to sawtooth when AO is poor.
 
-    A triangle wave is constructed between successive signal peaks.
-    Portions where the RMS amplitude envelope falls below *threshold*
-    are clamped to zero (stationary detection).
+    For each gait cycle (peak-to-peak of filtered Hip_x):
+    1. Build a sawtooth reference from -pi to pi.
+    2. Unwrap and shift the AO phase so it starts at -pi.
+    3. If the RMS error between aligned AO and sawtooth exceeds
+       *ao_error_threshold*, use the sawtooth for that cycle;
+       otherwise keep the aligned AO (preserves real AO dynamics).
 
-    :param filtered_signal: Bandpass-filtered signal array.
+    :param filtered_signal: Bandpass-filtered Hip_x signal.
+    :param ao_phase: Raw Hip_x_ao phase signal (expected in [-pi, pi]).
     :param dt: Sampling period in seconds.
     :param threshold: Amplitude threshold for stationary detection.
     :param window_time: Window length (seconds) for the RMS envelope.
-    :return: (triangle_wave, amplitude_envelope) arrays.
+    :param ao_error_threshold: Max RMS error (rad) before falling back to sawtooth.
+    :return: (aligned_phase, amplitude_envelope) arrays.
     """
-    # Minimum peak spacing: half a cycle at the bandpass high-cutoff frequency
     min_distance = int(0.99 / (BANDPASS_HIGHCUT * dt))
-    peak, _ = find_peaks(filtered_signal, height=0, distance=min_distance)
+    peaks, _ = find_peaks(filtered_signal, height=0, width=min_distance)
 
-    # Build triangle wave from peak to peak, spanning [-pi, pi]
-    triangle_wave = np.zeros_like(filtered_signal)
-    for i in range(len(peak) - 1):
-        start, end = peak[i], peak[i + 1]
-        triangle_wave[start:end] = np.linspace(-np.pi, np.pi, end - start)
+    aligned_phase = np.zeros_like(ao_phase)
+
+    for i in range(len(peaks) - 1):
+        start, end = peaks[i], peaks[i + 1]
+        n_samples = end - start
+
+        # Sawtooth reference: linear ramp from -pi to pi
+        sawtooth = np.linspace(-np.pi, np.pi, n_samples)
+
+        # Aligned AO: shift so cycle starts at -pi, then wrap to [-pi, pi]
+        shifted = ao_phase[start:end] + (-np.pi - ao_phase[start])
+        aligned_ao = (shifted + np.pi) % (2 * np.pi) - np.pi
+
+        # Per-cycle quality check
+        rms_error = np.sqrt(np.mean((aligned_ao - sawtooth) ** 2))
+        if rms_error > ao_error_threshold:
+            aligned_phase[start:end] = sawtooth
+        else:
+            aligned_phase[start:end] = aligned_ao
 
     # RMS amplitude envelope via moving average of squared signal
     window_size = max(1, int(window_time / dt))
@@ -117,10 +137,10 @@ def extract_true_phase(
     )
     amplitude_envelope = np.sqrt(mean_squared)
 
-    # Clamp phase to zero where the subject is stationary
-    triangle_wave[amplitude_envelope < threshold] = 0
+    # Clamp to zero where stationary
+    aligned_phase[amplitude_envelope < threshold] = 0
 
-    return triangle_wave, amplitude_envelope
+    return aligned_phase, amplitude_envelope
 
 
 def generate_gru_targets(

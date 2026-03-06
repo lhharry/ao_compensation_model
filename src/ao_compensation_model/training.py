@@ -20,7 +20,7 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, Concatenate, Dense, Input, UnitNormalization
+from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
@@ -105,10 +105,9 @@ def build_gru_model(
         recurrent_dropout=DROPOUT_RATE,
     )(inp)
     phase_out = Dense(units=2, activation="linear")(x)
-    phase_normalized = UnitNormalization(axis=1, name="l2_norm")(phase_out)
+    phase_normalized = UnitNormalization(axis=1, name="phase")(phase_out)
     omega_out = Dense(units=1, activation="linear", name="omega")(x)
-    output = Concatenate()([phase_normalized, omega_out])
-    return Model(inputs=inp, outputs=output)
+    return Model(inputs=inp, outputs={"phase": phase_normalized, "omega": omega_out})
 
 
 def train():
@@ -161,8 +160,15 @@ def train():
     x, y, w = x[idx], y[idx], w[idx]
 
     # --- Train ---
+    y_phase = y[:, :2]  # [sin, cos]
+    y_omega = y[:, 2:3]  # [omega]
+
     model = build_gru_model(WINDOW_SIZE, x.shape[2])
-    model.compile(optimizer=Adam(learning_rate=LEARNING_RATE), loss="mse")
+    model.compile(
+        optimizer=Adam(learning_rate=LEARNING_RATE),
+        loss={"phase": "mse", "omega": "mse"},
+        loss_weights={"phase": 1.0, "omega": 2.0},
+    )
 
     callbacks = [
         ReduceLROnPlateau(
@@ -181,7 +187,7 @@ def train():
 
     model.fit(
         x,
-        y,
+        {"phase": y_phase, "omega": y_omega},
         epochs=MAX_EPOCHS,
         batch_size=BATCH_SIZE,
         validation_split=0.2,

@@ -15,8 +15,8 @@ from ao_compensation_model.definitions import (
     TRAINING_DATA_DIR,
 )
 from ao_compensation_model.utils import (
+    align_ao_phase,
     bandpass_filter,
-    extract_true_phase,
     generate_gru_targets,
 )
 
@@ -34,14 +34,17 @@ def prepare_targets(
     df = pd.read_csv(input_path, sep=";")
 
     raw_hip_angle = np.asarray(df["Hip_x"].values)
+    ao_phase = np.asarray(df["Hip_x_ao"].values)
 
     # Bandpass filter to remove noise and DC offset
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
 
-    # Extract true phase and amplitude envelope
-    true_phase, _ = extract_true_phase(filtered_hip, threshold=threshold)
-    tp_cos = np.cos(true_phase)
-    tp_sin = np.sin(true_phase)
+    # Align AO phase so that its peak corresponds to Hip_x peak
+    aligned_phase, _ = align_ao_phase(
+        filtered_hip, ao_phase, threshold=threshold
+    )
+    tp_cos = np.cos(aligned_phase)
+    tp_sin = np.sin(aligned_phase)
 
     # Compute GRU targets (delta-phi decomposed into cos and sin)
     gru_targets = generate_gru_targets(tp_cos, tp_sin)
@@ -62,11 +65,13 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
 
     t = pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
     raw_hip_angle = np.asarray(df["Hip_x"].values)
-    ao_gait_phase = np.asarray(df["Hip_x_ao"].values)
+    ao_raw_phase = np.asarray(df["Hip_x_ao"].values)
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
-    true_phase, amplitude = extract_true_phase(filtered_hip, threshold=threshold)
-    tp_cos = np.cos(true_phase)
-    tp_sin = np.sin(true_phase)
+    aligned_phase, amplitude = align_ao_phase(
+        filtered_hip, ao_raw_phase, threshold=threshold
+    )
+    tp_cos = np.cos(aligned_phase)
+    tp_sin = np.sin(aligned_phase)
     gru_targets = generate_gru_targets(tp_cos, tp_sin)
 
     _, axs = plt.subplots(4, 1, figsize=(14, 12), sharex=True)
@@ -92,18 +97,20 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
     axs[1].grid(True, alpha=0.3)
     axs[1].legend()
 
-    axs[2].set_title("Step 3: True Phase vs AO Phase")
-    axs[2].plot(t, true_phase, label=r"True Phase $\phi_{true}$", color="green")
+    axs[2].set_title("Step 3: Raw AO Phase vs Aligned AO Phase")
     axs[2].plot(
-        t, ao_gait_phase, label=r"AO Phase $\phi_{AO}$", color="red", linestyle="--"
+        t, ao_raw_phase, label=r"Raw AO Phase $\phi_{AO}$", color="red", alpha=0.5
+    )
+    axs[2].plot(
+        t, aligned_phase, label=r"Aligned AO Phase", color="green"
     )
     axs[2].set_ylabel("Phase (Rad)")
     axs[2].grid(True, alpha=0.3)
     axs[2].legend()
 
-    axs[3].set_title("Step 4: GRU Target (True Phase)")
-    axs[3].plot(t, gru_targets[:, 0], label="True Phase Cos", color="purple")
-    axs[3].plot(t, gru_targets[:, 1], label="True Phase Sin", color="darkblue")
+    axs[3].set_title("Step 4: GRU Target (Aligned AO Phase)")
+    axs[3].plot(t, gru_targets[:, 0], label="Target Cos", color="purple")
+    axs[3].plot(t, gru_targets[:, 1], label="Target Sin", color="darkblue")
     axs[3].set_ylabel("Phase (Rad)")
     axs[3].set_xlabel("Time")
     axs[3].grid(True, alpha=0.3)

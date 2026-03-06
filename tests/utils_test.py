@@ -8,10 +8,10 @@ import numpy as np
 from ao_compensation_model.definitions import LogLevel
 from ao_compensation_model.utils import (
     RealTimeBandpassFilter,
+    align_ao_phase,
     bandpass_filter,
     create_sliding_windows,
     create_timestamped_filepath,
-    extract_true_phase,
     generate_gru_targets,
     setup_logger,
 )
@@ -76,47 +76,24 @@ def test_realtime_bandpass_filter():
 # ---------------------------------------------------------------------------
 
 
-def test_extract_true_phase_output_shape():
-    """extract_true_phase should return arrays of same length as input."""
-    fs = 100
-    t = np.arange(0, 5, 1 / fs)
-    signal = np.sin(2 * np.pi * 1.0 * t)
-    filtered = bandpass_filter(signal, fs=fs)
-    phase, amplitude = extract_true_phase(filtered, dt=1 / fs)
-    assert phase.shape == filtered.shape
-    assert amplitude.shape == filtered.shape
-
-
-def test_extract_true_phase_stationary_clamped():
-    """Stationary regions (near-zero signal) should produce phase ~ 0."""
-    n = 500
-    signal = np.zeros(n)
-    # A tiny signal — should be detected as stationary
-    signal += 0.001 * np.sin(2 * np.pi * np.arange(n) / 100)
-    phase, _ = extract_true_phase(signal, dt=0.01, threshold=0.083)
-    assert np.all(np.abs(phase) < 0.01)
-
-
 def test_generate_gru_targets_shape():
     """generate_gru_targets should return (N, 2) array."""
     n = 100
     tp_cos = np.cos(np.linspace(0, 4 * np.pi, n))
     tp_sin = np.sin(np.linspace(0, 4 * np.pi, n))
-    ao_cos = np.cos(np.linspace(0, 4 * np.pi, n) + 0.5)
-    ao_sin = np.sin(np.linspace(0, 4 * np.pi, n) + 0.5)
-    targets = generate_gru_targets(tp_cos, tp_sin, ao_cos, ao_sin)
+    targets = generate_gru_targets(tp_cos, tp_sin)
     assert targets.shape == (n, 2)
 
 
-def test_generate_gru_targets_identity():
-    """When AO phase == true phase, delta-phi should be (1, 0)."""
+def test_generate_gru_targets_values():
+    """generate_gru_targets should return cos/sin values."""
     n = 50
     phase = np.linspace(0, 2 * np.pi, n)
     cos_p = np.cos(phase)
     sin_p = np.sin(phase)
-    targets = generate_gru_targets(cos_p, sin_p, cos_p, sin_p)
-    np.testing.assert_allclose(targets[:, 0], 1.0, atol=1e-10)
-    np.testing.assert_allclose(targets[:, 1], 0.0, atol=1e-10)
+    targets = generate_gru_targets(cos_p, sin_p)
+    np.testing.assert_allclose(targets[:, 0], cos_p, atol=1e-10)
+    np.testing.assert_allclose(targets[:, 1], sin_p, atol=1e-10)
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +112,48 @@ def test_create_sliding_windows_shape():
     assert x.shape[2] == f
     assert y.shape[1] == 2
     assert x.shape[0] == y.shape[0]
+
+
+def test_align_ao_phase_output_shape():
+    """align_ao_phase should return arrays of same length as input."""
+    fs = 100
+    t = np.arange(0, 5, 1 / fs)
+    signal = np.sin(2 * np.pi * 1.0 * t)
+    filtered = bandpass_filter(signal, fs=fs)
+    # Simulate an AO phase that wraps around [-pi, pi]
+    ao_phase = np.mod(2 * np.pi * 1.0 * t + 0.5, 2 * np.pi) - np.pi
+    aligned, amplitude = align_ao_phase(filtered, ao_phase, dt=1 / fs)
+    assert aligned.shape == filtered.shape
+    assert amplitude.shape == filtered.shape
+
+
+def test_align_ao_phase_bounded():
+    """Aligned AO phase should be in [-pi, pi]."""
+    fs = 100
+    t = np.arange(0, 5, 1 / fs)
+    signal = 10 * np.sin(2 * np.pi * 1.0 * t)
+    filtered = bandpass_filter(signal, fs=fs)
+    ao_phase = np.mod(2 * np.pi * 1.0 * t + 1.0, 2 * np.pi) - np.pi
+    aligned, _ = align_ao_phase(filtered, ao_phase, dt=1 / fs)
+    assert np.all(aligned >= -np.pi - 0.1)
+    assert np.all(aligned <= np.pi + 0.1)
+
+
+def test_align_ao_phase_sawtooth_fallback():
+    """Bad AO should fall back to sawtooth (linear ramp)."""
+    fs = 100
+    t = np.arange(0, 5, 1 / fs)
+    signal = 10 * np.sin(2 * np.pi * 1.0 * t)
+    filtered = bandpass_filter(signal, fs=fs)
+    # Deliberately bad AO: random noise
+    rng = np.random.default_rng(42)
+    bad_ao = rng.uniform(-np.pi, np.pi, len(t))
+    aligned, _ = align_ao_phase(filtered, bad_ao, dt=1 / fs, ao_error_threshold=0.5)
+    # All non-zero segments should be within [-pi, pi] (sawtooth bounds)
+    nonzero = aligned[aligned != 0]
+    if len(nonzero) > 0:
+        assert np.all(nonzero >= -np.pi - 1e-10)
+        assert np.all(nonzero <= np.pi + 1e-10)
 
 
 def test_create_sliding_windows_stride():

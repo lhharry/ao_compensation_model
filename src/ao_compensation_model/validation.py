@@ -106,11 +106,19 @@ def run_tflite_inference(x: np.ndarray, model_path: Path) -> np.ndarray:
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
+    # Identify which output is phase (shape 2) and which is omega (shape 1)
+    if output_details[0]["shape"][-1] == 2:
+        phase_idx, omega_idx = 0, 1
+    else:
+        phase_idx, omega_idx = 1, 0
+
     predictions = []
     for i in range(len(x)):
         interpreter.set_tensor(input_details[0]["index"], x[i : i + 1])
         interpreter.invoke()
-        predictions.append(interpreter.get_tensor(output_details[0]["index"])[0])
+        phase = interpreter.get_tensor(output_details[phase_idx]["index"])[0]
+        omega = interpreter.get_tensor(output_details[omega_idx]["index"])[0]
+        predictions.append(np.concatenate([phase, omega]))
 
     return np.array(predictions)
 

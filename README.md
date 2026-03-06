@@ -93,7 +93,7 @@ uv run python -m ao_compensation_model txt2csv --file /path/to/folder
 
 ```python
 from ao_compensation_model.training import build_gru_model, compute_sample_weights
-from ao_compensation_model.utils import bandpass_filter, extract_true_phase
+from ao_compensation_model.utils import bandpass_filter, align_ao_phase
 from ao_compensation_model.validation import validate
 ```
 
