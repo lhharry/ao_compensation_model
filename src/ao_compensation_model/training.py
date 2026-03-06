@@ -20,7 +20,7 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization
+from tensorflow.keras.layers import GRU, Concatenate, Dense, Input, UnitNormalization
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
@@ -62,31 +62,26 @@ def compute_sample_weights(omega_values: np.ndarray) -> np.ndarray:
     return weights.astype(np.float32)
 
 
-def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Load a single labelled CSV and return features, targets, and omega.
+def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Load a single labelled CSV and return features and targets.
 
     :param csv_path: Path to a training CSV with target_cos / target_sin columns.
-    :return: (features, targets, omega) arrays.
+    :return: (features, targets) arrays. Targets have columns [sin, cos, omega].
     """
     df = pd.read_csv(csv_path, sep=";")
 
     raw_angle = np.asarray(df["Hip_x"].values)
-    ao_gait_phase = np.asarray(df["Hip_x_ao"].values)
     angular_velocity = np.asarray(df["Hip_x_vel"].values)
+
     omega = np.asarray(df["Hip_x_omega"].values)
-    domega = np.clip(np.asarray(df["Hip_x_domega"].values), -20.0, 20.0)
-
-    ao_phase_sin = np.sin(ao_gait_phase)
-    ao_phase_cos = np.cos(ao_gait_phase)
-
     target_sin = np.asarray(df["target_sin"].values)
     target_cos = np.asarray(df["target_cos"].values)
-    targets = np.column_stack([target_sin, target_cos])
+    targets = np.column_stack([target_sin, target_cos, omega])
 
     features = np.column_stack(
-        [raw_angle, angular_velocity, omega, domega, ao_phase_sin, ao_phase_cos]
+        [raw_angle, angular_velocity]
     )
-    return features, targets, omega
+    return features, targets
 
 
 def build_gru_model(
@@ -109,9 +104,11 @@ def build_gru_model(
         dropout=DROPOUT_RATE,
         recurrent_dropout=DROPOUT_RATE,
     )(inp)
-    linear_out = Dense(units=2, activation="linear")(x)
-    normalized_out = UnitNormalization(axis=1, name="l2_norm")(linear_out)
-    return Model(inputs=inp, outputs=normalized_out)
+    phase_out = Dense(units=2, activation="linear")(x)
+    phase_normalized = UnitNormalization(axis=1, name="l2_norm")(phase_out)
+    omega_out = Dense(units=1, activation="linear", name="omega")(x)
+    output = Concatenate()([phase_normalized, omega_out])
+    return Model(inputs=inp, outputs=output)
 
 
 def train():
@@ -128,23 +125,23 @@ def train():
 
     file_data = []
     for csv_file in csv_files:
-        features, targets, omega = preprocess_one_csv(csv_file)
-        file_data.append((features, targets, omega))
+        features, targets = preprocess_one_csv(csv_file)
+        file_data.append((features, targets))
 
     # --- Fit scaler on the union of all files ---
-    all_features = np.vstack([f for f, _, _ in file_data])
+    all_features = np.vstack([f for f, _ in file_data])
     scaler = StandardScaler()
     scaler.fit(all_features)
     joblib.dump(scaler, scaler_path)
 
     # --- Create sliding windows per file, then merge ---
     x_list, y_list, w_list = [], [], []
-    for features, targets, omega in file_data:
+    for features, targets in file_data:
         features_scaled = np.asarray(scaler.transform(features))
         x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE)
         if len(x_file) == 0:
             continue
-        omega_aligned = omega[WINDOW_SIZE : WINDOW_SIZE + len(x_file)]
+        omega_aligned = y_file[:, 2]
         w_file = compute_sample_weights(omega_aligned)
         x_list.append(x_file)
         y_list.append(y_file)

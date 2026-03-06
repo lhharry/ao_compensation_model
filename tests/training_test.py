@@ -47,7 +47,7 @@ def test_compute_sample_weights_dtype():
 
 
 def test_preprocess_one_csv(tmp_path):
-    """preprocess_one_csv should return features, targets, and omega arrays."""
+    """preprocess_one_csv should return features and targets arrays."""
     n = 300
     t = np.arange(n)
     df = pd.DataFrame(
@@ -64,44 +64,21 @@ def test_preprocess_one_csv(tmp_path):
     csv_path = tmp_path / "train.csv"
     df.to_csv(csv_path, index=False, sep=";")
 
-    features, targets, omega = preprocess_one_csv(csv_path)
+    features, targets = preprocess_one_csv(csv_path)
 
-    assert features.shape == (n, 6)
-    assert targets.shape == (n, 2)
-    assert omega.shape == (n,)
-
-
-def test_preprocess_one_csv_clips_domega(tmp_path):
-    """Domega values should be clipped to [-20, 20]."""
-    n = 100
-    df = pd.DataFrame(
-        {
-            "Hip_x": np.zeros(n),
-            "Hip_x_ao": np.zeros(n),
-            "Hip_x_vel": np.zeros(n),
-            "Hip_x_omega": np.zeros(n),
-            "Hip_x_domega": np.full(n, 100.0),  # should be clipped to 20
-            "target_sin": np.zeros(n),
-            "target_cos": np.ones(n),
-        }
-    )
-    csv_path = tmp_path / "train.csv"
-    df.to_csv(csv_path, index=False, sep=";")
-
-    features, _, _ = preprocess_one_csv(csv_path)
-    # domega is the 4th feature column (index 3)
-    assert np.all(features[:, 3] <= 20.0)
+    assert features.shape == (n, 2)
+    assert targets.shape == (n, 3)
 
 
 def test_build_gru_model_output_shape():
     """GRU model should have the correct input/output shapes."""
-    n_features = 6
+    n_features = 2
     model = build_gru_model(WINDOW_SIZE, n_features)
     assert model.input_shape == (None, WINDOW_SIZE, n_features)
-    assert model.output_shape == (None, 2)
+    assert model.output_shape == (None, 3)
 
 
 def test_build_gru_model_with_batch_size():
     """GRU model with fixed batch_size=1 should compile."""
-    model = build_gru_model(WINDOW_SIZE, 6, batch_size=1)
-    assert model.output_shape == (1, 2)
+    model = build_gru_model(WINDOW_SIZE, 2, batch_size=1)
+    assert model.output_shape == (1, 3)
