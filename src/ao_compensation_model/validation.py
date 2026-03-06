@@ -158,7 +158,7 @@ def plot_results(result: ValidationResult) -> None:
 
     :param result: A :class:`ValidationResult` produced by :func:`reconstruct_phases`.
     """
-    _, axs = plt.subplots(3, 1, figsize=(14, 12), sharex=True)
+    _, axs = plt.subplots(4, 1, figsize=(14, 16), sharex=True)
     t = result.time_axis
 
     # Panel 1 — Raw kinematics
@@ -199,12 +199,25 @@ def plot_results(result: ValidationResult) -> None:
     axs[1].grid(True, alpha=0.3)
 
     # Panel 3 — Phase comparison
-    axs[2].set_title(
-        r"3. Final Phase Comparison [$-\pi, \pi$]: Original AO vs Enhanced (AO + GRU)",
+    # Panel 3 — Omega comparison
+    axs[2].set_title("3. Omega: True vs Predicted", fontsize=14, fontweight="bold")
+    axs[2].plot(
+        t, result.target_omega, label="True Omega", color="blue", linewidth=2,
+    )
+    axs[2].plot(
+        t, result.pred_omega, label="Predicted Omega", color="red", linestyle="--", linewidth=1.5,
+    )
+    axs[2].set_ylabel("Omega (rad/s)")
+    axs[2].legend(loc="upper right")
+    axs[2].grid(True, alpha=0.3)
+
+    # Panel 4 — Phase comparison
+    axs[3].set_title(
+        r"4. Final Phase Comparison [$-\pi, \pi$]: Original AO vs Enhanced (AO + GRU)",
         fontsize=14,
         fontweight="bold",
     )
-    axs[2].plot(
+    axs[3].plot(
         t,
         result.true_phase,
         label="True Phase",
@@ -212,7 +225,7 @@ def plot_results(result: ValidationResult) -> None:
         linewidth=2.5,
         alpha=0.6,
     )
-    axs[2].plot(
+    axs[3].plot(
         t,
         result.ao_phase,
         label="Original AO Phase",
@@ -220,19 +233,19 @@ def plot_results(result: ValidationResult) -> None:
         linestyle="--",
         linewidth=1.5,
     )
-    axs[2].plot(
+    axs[3].plot(
         t,
         result.enhanced_phase,
         label="Enhanced Phase (GRU)",
         color="blue",
         linewidth=2,
     )
-    axs[2].set_yticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
-    axs[2].set_yticklabels([r"$-\pi$", r"$-\pi/2$", "0", r"$\pi/2$", r"$\pi$"])
-    axs[2].set_ylabel("Gait Phase (Rad)")
-    axs[2].set_xlabel("Time (Seconds)")
-    axs[2].legend(loc="upper right")
-    axs[2].grid(True, alpha=0.3)
+    axs[3].set_yticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
+    axs[3].set_yticklabels([r"$-\pi$", r"$-\pi/2$", "0", r"$\pi/2$", r"$\pi$"])
+    axs[3].set_ylabel("Gait Phase (Rad)")
+    axs[3].set_xlabel("Time (Seconds)")
+    axs[3].legend(loc="upper right")
+    axs[3].grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()

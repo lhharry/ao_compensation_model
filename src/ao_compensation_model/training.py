@@ -166,7 +166,7 @@ def train():
 
     callbacks = [
         ReduceLROnPlateau(
-            monitor="val_loss", factor=0.75, patience=5, min_lr=1e-6, verbose=1
+            monitor="val_loss", factor=0.5, patience=5, min_lr=1e-6, verbose=1
         ),
         EarlyStopping(
             monitor="val_loss", patience=8, restore_best_weights=True, verbose=1
