@@ -20,7 +20,7 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization
+from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization, Conv1D, BatchNormalization, MaxPooling1D
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
@@ -32,34 +32,10 @@ from ao_compensation_model.definitions import (
     MAX_EPOCHS,
     MODEL_DIR,
     TRAINING_DATA_DIR,
+    VAL_SPLIT,
     WINDOW_SIZE,
 )
 from ao_compensation_model.utils import create_sliding_windows
-
-
-def compute_sample_weights(omega_values: np.ndarray) -> np.ndarray:
-    """Assign per-sample weights based on the AO frequency (omega).
-
-    Higher weights are given to transitional phases where the AO is
-    re-locking, because those are the most informative for the GRU.
-
-    :param omega_values: Array of omega values aligned to each window.
-    :return: Float32 weight array.
-    """
-    weights = np.where(
-        omega_values > 3.0,
-        0.5,  # Stable walking — AO already locked
-        np.where(
-            omega_values > 1.5,
-            1.0,  # Re-locking phase — most critical
-            np.where(
-                omega_values > 0.5,
-                0.8,  # Transition just starting
-                0.1,  # Fully stopped — target near zero
-            ),
-        ),
-    )
-    return weights.astype(np.float32)
 
 
 def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -125,49 +101,65 @@ def train():
     file_data = []
     for csv_file in csv_files:
         features, targets = preprocess_one_csv(csv_file)
-        file_data.append((features, targets))
+        file_data.append((csv_file.name, features, targets))
 
     # --- Fit scaler on the union of all files ---
-    all_features = np.vstack([f for f, _ in file_data])
+    all_features = np.vstack([f for _, f, _ in file_data])
     scaler = StandardScaler()
     scaler.fit(all_features)
     joblib.dump(scaler, scaler_path)
 
-    # --- Create sliding windows per file, then merge ---
-    x_list, y_list, w_list = [], [], []
-    for features, targets in file_data:
+    # --- File-level train/val split to prevent data leakage ---
+    rng = np.random.default_rng(42)
+    n_files = len(file_data)
+    n_val = max(1, round(n_files * VAL_SPLIT))
+    indices = rng.permutation(n_files)
+    val_indices = set(indices[:n_val])
+
+    x_train_list, y_train_list = [], []
+    x_val_list, y_val_list = [], []
+
+    for i, (name, features, targets) in enumerate(file_data):
         features_scaled = np.asarray(scaler.transform(features))
         x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE)
         if len(x_file) == 0:
             continue
-        omega_aligned = y_file[:, 2]
-        w_file = compute_sample_weights(omega_aligned)
-        x_list.append(x_file)
-        y_list.append(y_file)
-        w_list.append(w_file)
 
-    if not x_list:
+        if i in val_indices:
+            x_val_list.append(x_file)
+            y_val_list.append(y_file)
+        else:
+            x_train_list.append(x_file)
+            y_train_list.append(y_file)
+
+    if not x_train_list:
         raise ValueError(
-            f"No valid windows created. Check CSV lengths vs WINDOW_SIZE={WINDOW_SIZE}."
+            f"No valid training windows. Check CSV lengths vs WINDOW_SIZE={WINDOW_SIZE}."
         )
+    if not x_val_list:
+        raise ValueError("No validation files. Need at least 2 training CSVs.")
 
-    x = np.concatenate(x_list)
-    y = np.concatenate(y_list)
-    w = np.concatenate(w_list)
+    x_train = np.concatenate(x_train_list)
+    y_train = np.concatenate(y_train_list)
 
-    # Shuffle so the validation split contains a mix of all files
-    idx = np.random.permutation(len(x))
-    x, y, w = x[idx], y[idx], w[idx]
+    x_val = np.concatenate(x_val_list)
+    y_val = np.concatenate(y_val_list)
+
+    # Shuffle training data
+    idx = rng.permutation(len(x_train))
+    x_train, y_train = x_train[idx], y_train[idx]
 
     # --- Train ---
-    y_phase = y[:, :2]  # [sin, cos]
-    y_omega = y[:, 2:3]  # [omega]
+    y_train_phase = y_train[:, :2]
+    y_train_omega = y_train[:, 2:3]
+    y_val_phase = y_val[:, :2]
+    y_val_omega = y_val[:, 2:3]
 
-    model = build_gru_model(WINDOW_SIZE, x.shape[2])
+    model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE),
         loss={"phase": "mse", "omega": "mse"},
-        loss_weights={"phase": 1.0, "omega": 2.0},
+        loss_weights={"phase": 1.0, "omega": 5.0},
     )
 
     callbacks = [
@@ -186,18 +178,20 @@ def train():
     ]
 
     model.fit(
-        x,
-        {"phase": y_phase, "omega": y_omega},
+        x_train,
+        {"phase": y_train_phase, "omega": y_train_omega},
         epochs=MAX_EPOCHS,
         batch_size=BATCH_SIZE,
-        validation_split=0.2,
-        sample_weight=w,
+        validation_data=(
+            x_val,
+            {"phase": y_val_phase, "omega": y_val_omega},
+        ),
         callbacks=callbacks,
     )
 
     # --- Export to TFLite ---
     best_model = tf.keras.models.load_model(str(model_path), compile=False)
-    inference_model = build_gru_model(WINDOW_SIZE, x.shape[2], batch_size=1)
+    inference_model = build_gru_model(WINDOW_SIZE, x_train.shape[2], batch_size=1)
     inference_model.set_weights(best_model.get_weights())
 
     converter = tf.lite.TFLiteConverter.from_keras_model(inference_model)

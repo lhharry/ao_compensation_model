@@ -38,6 +38,7 @@ DROPOUT_RATE: float = 0.2
 BATCH_SIZE: int = 64
 MAX_EPOCHS: int = 100
 LEARNING_RATE: float = 0.001
+VAL_SPLIT: float = 0.2
 
 
 @dataclass

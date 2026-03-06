@@ -6,44 +6,8 @@ import pandas as pd
 from ao_compensation_model.definitions import WINDOW_SIZE
 from ao_compensation_model.training import (
     build_gru_model,
-    compute_sample_weights,
     preprocess_one_csv,
 )
-
-
-def test_compute_sample_weights_stable():
-    """High omega (>3) should get weight 0.5."""
-    omega = np.array([4.0, 5.0, 10.0])
-    weights = compute_sample_weights(omega)
-    np.testing.assert_array_equal(weights, 0.5)
-
-
-def test_compute_sample_weights_relocking():
-    """Omega in (1.5, 3.0] should get weight 1.0."""
-    omega = np.array([2.0, 2.5, 3.0])
-    weights = compute_sample_weights(omega)
-    np.testing.assert_array_equal(weights, 1.0)
-
-
-def test_compute_sample_weights_transition():
-    """Omega in (0.5, 1.5] should get weight 0.8."""
-    omega = np.array([0.6, 1.0, 1.5])
-    weights = compute_sample_weights(omega)
-    np.testing.assert_allclose(weights, 0.8, atol=1e-6)
-
-
-def test_compute_sample_weights_stopped():
-    """Omega <= 0.5 should get weight 0.1."""
-    omega = np.array([0.0, 0.3, 0.5])
-    weights = compute_sample_weights(omega)
-    np.testing.assert_allclose(weights, 0.1, atol=1e-6)
-
-
-def test_compute_sample_weights_dtype():
-    """Weights should be float32."""
-    omega = np.array([1.0, 2.0, 4.0])
-    weights = compute_sample_weights(omega)
-    assert weights.dtype == np.float32
 
 
 def test_preprocess_one_csv(tmp_path):
@@ -75,10 +39,10 @@ def test_build_gru_model_output_shape():
     n_features = 2
     model = build_gru_model(WINDOW_SIZE, n_features)
     assert model.input_shape == (None, WINDOW_SIZE, n_features)
-    assert model.output_shape == (None, 3)
+    assert model.output_shape == {"phase": (None, 2), "omega": (None, 1)}
 
 
 def test_build_gru_model_with_batch_size():
     """GRU model with fixed batch_size=1 should compile."""
     model = build_gru_model(WINDOW_SIZE, 2, batch_size=1)
-    assert model.output_shape == (1, 3)
+    assert model.output_shape == {"phase": (1, 2), "omega": (1, 1)}
