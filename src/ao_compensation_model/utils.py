@@ -134,6 +134,7 @@ def generate_gru_targets(
     :param tp_sin: Sine of the true phase.
     :return: Array of shape (N, 2) with columns [target_cos, target_sin].
     """
+    
     target_cos = tp_cos
     target_sin = tp_sin
     return np.column_stack([target_cos, target_sin])
