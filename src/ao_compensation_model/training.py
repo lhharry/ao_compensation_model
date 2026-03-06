@@ -20,7 +20,7 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization, Conv1D, BatchNormalization, MaxPooling1D
+from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
@@ -151,15 +151,21 @@ def train():
 
     # --- Train ---
     y_train_phase = y_train[:, :2]
-    y_train_omega = y_train[:, 2:3]
+    y_train_omega_raw = y_train[:, 2:3]
     y_val_phase = y_val[:, :2]
-    y_val_omega = y_val[:, 2:3]
+    y_val_omega_raw = y_val[:, 2:3]
+
+    # Normalize omega targets so loss scale matches phase (~[-1,1])
+    omega_scaler = StandardScaler()
+    y_train_omega = omega_scaler.fit_transform(y_train_omega_raw)
+    y_val_omega = omega_scaler.transform(y_val_omega_raw)
+    joblib.dump(omega_scaler, MODEL_DIR / "omega_scaler.pkl")
 
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE),
         loss={"phase": "mse", "omega": "mse"},
-        loss_weights={"phase": 1.0, "omega": 5.0},
+        loss_weights={"phase": 1.0, "omega": 1.0},
     )
 
     callbacks = [

@@ -276,6 +276,14 @@ def validate(csv_name: str) -> ValidationResult:
     )
     y_pred = run_tflite_inference(x, MODEL_DIR / "gru_model_optimized.tflite")
 
+    # Denormalize omega predictions
+    omega_scaler_path = MODEL_DIR / "omega_scaler.pkl"
+    if omega_scaler_path.exists():
+        omega_scaler = joblib.load(omega_scaler_path)
+        pred_omega = omega_scaler.inverse_transform(y_pred[:, 2:3]).ravel()
+    else:
+        pred_omega = y_pred[:, 2]
+
     result = reconstruct_phases(
         data,
         target_sin,
@@ -283,7 +291,7 @@ def validate(csv_name: str) -> ValidationResult:
         target_omega,
         pred_sin=y_pred[:, 0],
         pred_cos=y_pred[:, 1],
-        pred_omega=y_pred[:, 2],
+        pred_omega=pred_omega,
     )
     plot_results(result)
     return result
