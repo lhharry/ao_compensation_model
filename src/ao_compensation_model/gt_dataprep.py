@@ -1,7 +1,7 @@
 """Generate ground-truth GRU training targets from raw IMU recordings.
 
 Reads a raw CSV, applies bandpass filtering, extracts the true gait phase,
-computes true-phase sin/cos targets, and appends them to a new CSV for training.
+computes delta-phi targets, and appends them to a new CSV for training.
 """
 
 import matplotlib.pyplot as plt
@@ -34,6 +34,9 @@ def prepare_targets(
     df = pd.read_csv(input_path, sep=";")
 
     raw_hip_angle = np.asarray(df["Hip_x"].values)
+    ao_gait_phase = np.asarray(df["Hip_x_ao"].values)
+    ao_cos = np.cos(ao_gait_phase)
+    ao_sin = np.sin(ao_gait_phase)
 
     # Bandpass filter to remove noise and DC offset
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
@@ -44,7 +47,7 @@ def prepare_targets(
     tp_sin = np.sin(true_phase)
 
     # Compute GRU targets (delta-phi decomposed into cos and sin)
-    gru_targets = generate_gru_targets(tp_cos, tp_sin)
+    gru_targets = generate_gru_targets(tp_cos, tp_sin, ao_cos, ao_sin)
 
     df["target_cos"] = gru_targets[:, 0]
     df["target_sin"] = gru_targets[:, 1]
@@ -63,11 +66,14 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
     t = pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
     raw_hip_angle = np.asarray(df["Hip_x"].values)
     ao_gait_phase = np.asarray(df["Hip_x_ao"].values)
+    ao_cos = np.cos(ao_gait_phase)
+    ao_sin = np.sin(ao_gait_phase)
+
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
     true_phase, amplitude = extract_true_phase(filtered_hip, threshold=threshold)
     tp_cos = np.cos(true_phase)
     tp_sin = np.sin(true_phase)
-    gru_targets = generate_gru_targets(tp_cos, tp_sin)
+    gru_targets = generate_gru_targets(tp_cos, tp_sin, ao_cos, ao_sin)
 
     _, axs = plt.subplots(4, 1, figsize=(14, 12), sharex=True)
 
@@ -101,10 +107,10 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
     axs[2].grid(True, alpha=0.3)
     axs[2].legend()
 
-    axs[3].set_title("Step 4: GRU Target (True Phase)")
-    axs[3].plot(t, gru_targets[:, 0], label="True Phase Cos", color="purple")
-    axs[3].plot(t, gru_targets[:, 1], label="True Phase Sin", color="darkblue")
-    axs[3].set_ylabel("Phase (Rad)")
+    axs[3].set_title(r"Step 4: GRU Target $\Delta\phi$")
+    axs[3].plot(t, gru_targets[:, 0], label=r"$\Delta\phi$ Cos", color="purple")
+    axs[3].plot(t, gru_targets[:, 1], label=r"$\Delta\phi$ Sin", color="darkblue")
+    axs[3].set_ylabel("Phase Error (Rad)")
     axs[3].set_xlabel("Time")
     axs[3].grid(True, alpha=0.3)
     axs[3].legend()

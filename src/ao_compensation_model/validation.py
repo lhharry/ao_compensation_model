@@ -1,7 +1,7 @@
 """Validate the optimized TFLite GRU model on test data.
 
 Simulates frame-by-frame edge inference and visualises the comparison
-between original AO phase, GRU-predicted phase, and ground truth.
+between original AO phase, enhanced (AO + GRU) phase, and ground truth.
 """
 
 from dataclasses import dataclass
@@ -37,10 +37,8 @@ class ValidationResult:
     enhanced_phase: np.ndarray
     target_sin: np.ndarray
     target_cos: np.ndarray
-    target_omega: np.ndarray
     pred_sin: np.ndarray
     pred_cos: np.ndarray
-    pred_omega: np.ndarray
 
 
 # ---------------------------------------------------------------------------
@@ -60,8 +58,8 @@ def load_test_data(csv_path: Path) -> dict[str, np.ndarray]:
         "ao_gait_phase": np.asarray(df["Hip_x_ao"].values),
         "angular_velocity": np.asarray(df["Hip_x_vel"].values),
         "omega": np.asarray(df["Hip_x_omega"].values),
-        "target_cos": np.asarray(df["target_cos"].values),
-        "target_sin": np.asarray(df["target_sin"].values),
+        "domega": np.asarray(df["Hip_x_domega"].values),
+        "pred_gp": np.asarray(df["Hip_x_gp"].values),
     }
 
 
@@ -73,17 +71,25 @@ def prepare_features_and_targets(
 
     :param data: Raw column arrays from :func:`load_test_data`.
     :param scaler_path: Path to the fitted StandardScaler pickle.
-    :return: (x_windows, y_windows, target_sin, target_cos, target_omega).
+    :return: (x_windows, y_windows, target_sin, target_cos).
     """
-    target_sin = data["target_sin"]
-    target_cos = data["target_cos"]
-    target_omega = data["omega"]
-    targets = np.column_stack([target_sin, target_cos, target_omega])
+    ao_phase_sin = np.sin(data["ao_gait_phase"])
+    ao_phase_cos = np.cos(data["ao_gait_phase"])
+    pred_sin = np.sin(data["pred_gp"])
+    pred_cos = np.cos(data["pred_gp"])
+
+    target_sin = pred_cos * ao_phase_cos + pred_sin * ao_phase_sin
+    target_cos = pred_sin * ao_phase_cos - pred_cos * ao_phase_sin
+    targets = np.column_stack([target_sin, target_cos])
 
     features = np.column_stack(
         [
             data["raw_angle"],
             data["angular_velocity"],
+            data["omega"],
+            data["domega"],
+            ao_phase_sin,
+            ao_phase_cos,
         ]
     )
 
@@ -91,7 +97,7 @@ def prepare_features_and_targets(
     features_scaled = scaler.transform(features)
 
     x, y = create_sliding_windows(features_scaled, targets, WINDOW_SIZE, stride=1)
-    return x.astype(np.float32), y.astype(np.float32), target_sin, target_cos, target_omega
+    return x.astype(np.float32), y.astype(np.float32), target_sin, target_cos
 
 
 def run_tflite_inference(x: np.ndarray, model_path: Path) -> np.ndarray:
@@ -99,7 +105,7 @@ def run_tflite_inference(x: np.ndarray, model_path: Path) -> np.ndarray:
 
     :param x: Input windows of shape (N, WINDOW_SIZE, n_features).
     :param model_path: Path to the optimized .tflite model.
-    :return: Predictions of shape (N, 3) with [sin, cos, omega] columns.
+    :return: Predictions of shape (N, 2) with [sin, cos] columns.
     """
     interpreter = tflite.Interpreter(model_path=str(model_path))
     interpreter.allocate_tensors()
@@ -119,37 +125,45 @@ def reconstruct_phases(
     data: dict[str, np.ndarray],
     target_sin: np.ndarray,
     target_cos: np.ndarray,
-    target_omega: np.ndarray,
     pred_sin: np.ndarray,
     pred_cos: np.ndarray,
-    pred_omega: np.ndarray,
 ) -> ValidationResult:
     """Reconstruct true and enhanced gait phases from sin/cos components.
 
     :param data: Raw column arrays from :func:`load_test_data`.
-    :param target_sin: Ground-truth true-phase sine component.
-    :param target_cos: Ground-truth true-phase cosine component.
-    :param target_omega: Ground-truth omega values.
-    :param pred_sin: Predicted true-phase sine component.
-    :param pred_cos: Predicted true-phase cosine component.
-    :param pred_omega: Predicted omega values.
+    :param target_sin: Ground-truth delta-phi sine component.
+    :param target_cos: Ground-truth delta-phi cosine component.
+    :param pred_sin: Predicted delta-phi sine component.
+    :param pred_cos: Predicted delta-phi cosine component.
     :return: A :class:`ValidationResult` with all aligned arrays.
     """
     offset = WINDOW_SIZE
     ao_phase = data["ao_gait_phase"]
+    ao_sin = np.sin(ao_phase)
+    ao_cos = np.cos(ao_phase)
+
+    # True phase (ground truth reconstructed from targets)
+    true_cos = (
+        ao_cos[offset:] * target_cos[offset:] - ao_sin[offset:] * target_sin[offset:]
+    )
+    true_sin = (
+        ao_sin[offset:] * target_cos[offset:] + ao_cos[offset:] * target_sin[offset:]
+    )
+
+    # Enhanced phase (AO corrected by GRU prediction)
+    enh_cos = ao_cos[offset:] * pred_cos - ao_sin[offset:] * pred_sin
+    enh_sin = ao_sin[offset:] * pred_cos + ao_cos[offset:] * pred_sin
 
     return ValidationResult(
         time_axis=np.arange(len(ao_phase) - offset) / SAMPLING_FREQ,
         raw_angle=data["raw_angle"][offset:],
         ao_phase=ao_phase[offset:],
-        true_phase=np.arctan2(target_sin[offset:], target_cos[offset:]),
-        enhanced_phase=np.arctan2(pred_sin, pred_cos),
+        true_phase=np.arctan2(true_sin, true_cos),
+        enhanced_phase=np.arctan2(enh_sin, enh_cos),
         target_sin=target_sin[offset:],
         target_cos=target_cos[offset:],
-        target_omega=target_omega[offset:],
         pred_sin=pred_sin,
         pred_cos=pred_cos,
-        pred_omega=pred_omega,
     )
 
 
@@ -236,7 +250,7 @@ def plot_results(result: ValidationResult) -> None:
     axs[3].plot(
         t,
         result.enhanced_phase,
-        label="Enhanced Phase (GRU)",
+        label="Enhanced Phase (AO + GRU)",
         color="blue",
         linewidth=2,
     )
@@ -263,7 +277,7 @@ def validate(csv_name: str) -> ValidationResult:
     :return: A :class:`ValidationResult` with all computed arrays.
     """
     data = load_test_data(TEST_DATA_DIR / csv_name)
-    x, _, target_sin, target_cos, target_omega = prepare_features_and_targets(
+    x, _, target_sin, target_cos = prepare_features_and_targets(
         data, MODEL_DIR / "scaler.pkl"
     )
     y_pred = run_tflite_inference(x, MODEL_DIR / "gru_model_optimized.tflite")
@@ -272,10 +286,8 @@ def validate(csv_name: str) -> ValidationResult:
         data,
         target_sin,
         target_cos,
-        target_omega,
         pred_sin=y_pred[:, 0],
         pred_cos=y_pred[:, 1],
-        pred_omega=y_pred[:, 2],
     )
     plot_results(result)
     return result

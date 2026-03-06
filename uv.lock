@@ -60,7 +60,7 @@ wheels = [
 
 [[package]]
 name = "ao-compensation-model"
-version = "0.1.4"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "ai-edge-litert" },
