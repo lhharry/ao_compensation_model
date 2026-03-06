@@ -42,8 +42,14 @@ uv sync
 ### As a CLI
 
 ```bash
-# Prepare ground-truth targets from raw CSVs
+# Prepare ground-truth targets from all raw CSVs
 uv run python -m ao_compensation_model prep
+
+# Prepare a single CSV file
+uv run python -m ao_compensation_model prep --file 20260304_17_13_22_stopgo.csv
+
+# Prepare with a custom stationary threshold (default: 0.083)
+uv run python -m ao_compensation_model prep --file recording.csv --threshold 0.1
 
 # Train the GRU model
 uv run python -m ao_compensation_model train
@@ -51,6 +57,13 @@ uv run python -m ao_compensation_model train
 # Validate on test data
 uv run python -m ao_compensation_model validate
 ```
+
+| Flag | Applies to | Description |
+|------|-----------|-------------|
+| `--file` | `prep` | Process a single CSV instead of all files in `raw/`. Accepts a filename, relative, or absolute path. |
+| `--threshold` | `prep` | Amplitude threshold for stationary detection (default `0.083`). |
+| `--log-level` | all | Set the log level (`TRACE`, `DEBUG`, `INFO`, …). |
+| `--stderr-level` | all | Set the stderr level. |
 
 ### As a library
 

@@ -21,12 +21,15 @@ from ao_compensation_model.utils import (
 )
 
 
-def prepare_targets(input_path, output_path, fs=SAMPLING_FREQ):
+def prepare_targets(
+    input_path, output_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD
+):
     """Process a single raw CSV and write the file with appended targets.
 
     :param input_path: Path to the raw CSV file.
     :param output_path: Path for the output CSV with target columns.
     :param fs: Sampling frequency in Hz.
+    :param threshold: Amplitude threshold for stationary detection.
     """
     df = pd.read_csv(input_path, sep=";")
 
@@ -39,7 +42,7 @@ def prepare_targets(input_path, output_path, fs=SAMPLING_FREQ):
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
 
     # Extract true phase and amplitude envelope
-    true_phase, _ = extract_true_phase(filtered_hip)
+    true_phase, _ = extract_true_phase(filtered_hip, threshold=threshold)
     tp_cos = np.cos(true_phase)
     tp_sin = np.sin(true_phase)
 
@@ -51,11 +54,12 @@ def prepare_targets(input_path, output_path, fs=SAMPLING_FREQ):
     df.to_csv(output_path, index=False, sep=";")
 
 
-def visualize(input_path, fs=SAMPLING_FREQ):
+def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
     """Plot the full pipeline: raw signal, envelope, phase, and targets.
 
     :param input_path: Path to the raw CSV file.
     :param fs: Sampling frequency in Hz.
+    :param threshold: Amplitude threshold for stationary detection.
     """
     df = pd.read_csv(input_path, sep=";")
 
@@ -66,7 +70,7 @@ def visualize(input_path, fs=SAMPLING_FREQ):
     ao_sin = np.sin(ao_gait_phase)
 
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
-    true_phase, amplitude = extract_true_phase(filtered_hip)
+    true_phase, amplitude = extract_true_phase(filtered_hip, threshold=threshold)
     tp_cos = np.cos(true_phase)
     tp_sin = np.sin(true_phase)
     gru_targets = generate_gru_targets(tp_cos, tp_sin, ao_cos, ao_sin)
@@ -82,13 +86,13 @@ def visualize(input_path, fs=SAMPLING_FREQ):
     axs[1].set_title("Step 2: Amplitude Envelope & Thresholding")
     axs[1].plot(t, amplitude, label="Amplitude Envelope", color="orange")
     axs[1].axhline(
-        y=STATIONARY_THRESHOLD, color="red", linestyle="--", label="Static Threshold"
+        y=threshold, color="red", linestyle="--", label="Static Threshold"
     )
     axs[1].fill_between(
         t,
         0,
         amplitude,
-        where=(amplitude < STATIONARY_THRESHOLD),
+        where=(amplitude < threshold),
         color="red",
         alpha=0.2,
         label="Detected as Stopped",

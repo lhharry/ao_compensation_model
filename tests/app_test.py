@@ -36,10 +36,15 @@ def test_main_validate_command():
     """'validate' command should call validate for each test CSV."""
     mock_test_dir = MagicMock()
     mock_test_dir.glob.return_value = []
+    # validation.py imports ai_edge_litert which may not be installed in CI,
+    # so we mock the entire validate import inside main().
+    mock_validate_module = MagicMock()
     with (
         patch("ao_compensation_model.app.setup_logger"),
-        patch.dict("ao_compensation_model.app.__builtins__", {}, clear=False),
+        patch("ao_compensation_model.definitions.TEST_DATA_DIR", mock_test_dir),
+        patch.dict(
+            "sys.modules",
+            {"ao_compensation_model.validation": mock_validate_module},
+        ),
     ):
-        # validate is lazily imported inside main(); mock TEST_DATA_DIR at definition site
-        with patch("ao_compensation_model.definitions.TEST_DATA_DIR", mock_test_dir):
-            main(command="validate")
+        main(command="validate")

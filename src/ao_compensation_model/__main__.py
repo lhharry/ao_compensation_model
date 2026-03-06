@@ -3,7 +3,7 @@
 import argparse
 
 from ao_compensation_model.app import main
-from ao_compensation_model.definitions import DEFAULT_LOG_LEVEL, LogLevel
+from ao_compensation_model.definitions import DEFAULT_LOG_LEVEL, LogLevel, STATIONARY_THRESHOLD
 
 if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser("ao_compensation_model pipeline")
@@ -11,6 +11,20 @@ if __name__ == "__main__":  # pragma: no cover
         "command",
         choices=["prep", "train", "validate"],
         help="Pipeline step to run: prep | train | validate",
+    )
+    parser.add_argument(
+        "--file",
+        default=None,
+        help="Process a single CSV file (name or path) instead of all files.",
+        required=False,
+        type=str,
+    )
+    parser.add_argument(
+        "--threshold",
+        default=STATIONARY_THRESHOLD,
+        help=f"Stationary amplitude threshold (default: {STATIONARY_THRESHOLD}).",
+        required=False,
+        type=float,
     )
     parser.add_argument(
         "--log-level",
@@ -32,6 +46,8 @@ if __name__ == "__main__":  # pragma: no cover
 
     main(
         command=args.command,
+        file=args.file,
+        threshold=args.threshold,
         log_level=args.log_level,
         stderr_level=args.stderr_level,
     )
