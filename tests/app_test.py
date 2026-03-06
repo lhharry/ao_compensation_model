@@ -1,6 +1,6 @@
 """Test the main program."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from ao_compensation_model.app import main
 

@@ -34,7 +34,7 @@ def _run_prep(file: str | None, threshold: float) -> None:
     logger.success("Data preparation complete.")
 
 
-def _run_train() -> None:
+def _run_train(file: str | None, threshold: float) -> None:
     """Train the GRU model."""
     from ao_compensation_model.training import train
 
@@ -43,7 +43,7 @@ def _run_train() -> None:
     logger.success("Training complete.")
 
 
-def _run_validate(file: str | None) -> None:
+def _run_validate(file: str | None, threshold: float) -> None:
     """Validate model on test data."""
     from ao_compensation_model.definitions import TEST_DATA_DIR
     from ao_compensation_model.validation import validate
@@ -63,7 +63,7 @@ def _run_validate(file: str | None) -> None:
     logger.success("Validation complete.")
 
 
-def _run_txt2csv(file: str | None) -> None:
+def _run_txt2csv(file: str | None, threshold: float) -> None:
     """Convert text sensor files to semicolon-delimited CSVs."""
     from ao_compensation_model.txt2csv import convert_folder_to_csv
 
@@ -76,9 +76,7 @@ def _run_txt2csv(file: str | None) -> None:
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
-        folder = filedialog.askdirectory(
-            title="Select Folder Containing Sensor Files"
-        )
+        folder = filedialog.askdirectory(title="Select Folder Containing Sensor Files")
         root.destroy()
 
     if folder:
@@ -90,10 +88,10 @@ def _run_txt2csv(file: str | None) -> None:
 
 
 _COMMANDS = {
-    "prep": lambda f, t: _run_prep(f, t),
-    "train": lambda f, t: _run_train(),
-    "validate": lambda f, t: _run_validate(f),
-    "txt2csv": lambda f, t: _run_txt2csv(f),
+    "prep": _run_prep,
+    "train": _run_train,
+    "validate": _run_validate,
+    "txt2csv": _run_txt2csv,
 }
 
 

@@ -51,7 +51,7 @@ def test_prepare_targets_values_bounded():
 
 
 def test_visualize_does_not_crash():
-    """visualize should run without error (with plt.show mocked)."""
+    """Visualize should run without error (with plt.show mocked)."""
     from ao_compensation_model.gt_dataprep import visualize
 
     with TemporaryDirectory() as tmpdir:

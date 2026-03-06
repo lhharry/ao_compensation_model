@@ -3,7 +3,11 @@
 import argparse
 
 from ao_compensation_model.app import main
-from ao_compensation_model.definitions import DEFAULT_LOG_LEVEL, LogLevel, STATIONARY_THRESHOLD
+from ao_compensation_model.definitions import (
+    DEFAULT_LOG_LEVEL,
+    STATIONARY_THRESHOLD,
+    LogLevel,
+)
 
 if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser("ao_compensation_model pipeline")

@@ -7,12 +7,11 @@ between original AO phase, enhanced (AO + GRU) phase, and ground truth.
 from dataclasses import dataclass
 from pathlib import Path
 
+import ai_edge_litert.interpreter as tflite  # type: ignore[import-untyped]
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-import ai_edge_litert.interpreter as tflite  # type: ignore[import-untyped]
 
 from ao_compensation_model.definitions import (
     MODEL_DIR,
@@ -21,7 +20,6 @@ from ao_compensation_model.definitions import (
     WINDOW_SIZE,
 )
 from ao_compensation_model.utils import create_sliding_windows
-
 
 # ---------------------------------------------------------------------------
 # Data container
@@ -145,8 +143,12 @@ def reconstruct_phases(
     ao_cos = np.cos(ao_phase)
 
     # True phase (ground truth reconstructed from targets)
-    true_cos = ao_cos[offset:] * target_cos[offset:] - ao_sin[offset:] * target_sin[offset:]
-    true_sin = ao_sin[offset:] * target_cos[offset:] + ao_cos[offset:] * target_sin[offset:]
+    true_cos = (
+        ao_cos[offset:] * target_cos[offset:] - ao_sin[offset:] * target_sin[offset:]
+    )
+    true_sin = (
+        ao_sin[offset:] * target_cos[offset:] + ao_cos[offset:] * target_sin[offset:]
+    )
 
     # Enhanced phase (AO corrected by GRU prediction)
     enh_cos = ao_cos[offset:] * pred_cos - ao_sin[offset:] * pred_sin
@@ -176,9 +178,12 @@ def plot_results(result: ValidationResult) -> None:
     # Panel 1 — Raw kinematics
     axs[0].set_title(
         "1. Hip Kinematics (Stop-to-Walking / Walking-to-Stop Events)",
-        fontsize=14, fontweight="bold",
+        fontsize=14,
+        fontweight="bold",
     )
-    axs[0].plot(t, result.raw_angle, label="Raw Hip Angle (deg)", color="gray", alpha=0.8)
+    axs[0].plot(
+        t, result.raw_angle, label="Raw Hip Angle (deg)", color="gray", alpha=0.8
+    )
     axs[0].set_ylabel("Angle")
     axs[0].legend(loc="upper right")
     axs[0].grid(True, alpha=0.3)
@@ -187,8 +192,22 @@ def plot_results(result: ValidationResult) -> None:
     axs[1].set_title("2. Predicted Sin/Cos vs Target", fontsize=14, fontweight="bold")
     axs[1].plot(t, result.target_sin, label="Target Sin", color="blue", linewidth=2)
     axs[1].plot(t, result.target_cos, label="Target Cos", color="orange", linewidth=2)
-    axs[1].plot(t, result.pred_sin, label="Predicted Sin", color="purple", linestyle="--", linewidth=1.5)
-    axs[1].plot(t, result.pred_cos, label="Predicted Cos", color="green", linestyle="--", linewidth=1.5)
+    axs[1].plot(
+        t,
+        result.pred_sin,
+        label="Predicted Sin",
+        color="purple",
+        linestyle="--",
+        linewidth=1.5,
+    )
+    axs[1].plot(
+        t,
+        result.pred_cos,
+        label="Predicted Cos",
+        color="green",
+        linestyle="--",
+        linewidth=1.5,
+    )
     axs[1].set_ylabel("Amplitude")
     axs[1].legend(loc="upper right")
     axs[1].grid(True, alpha=0.3)
@@ -196,11 +215,32 @@ def plot_results(result: ValidationResult) -> None:
     # Panel 3 — Phase comparison
     axs[2].set_title(
         r"3. Final Phase Comparison [$-\pi, \pi$]: Original AO vs Enhanced (AO + GRU)",
-        fontsize=14, fontweight="bold",
+        fontsize=14,
+        fontweight="bold",
     )
-    axs[2].plot(t, result.true_phase, label="True Phase", color="green", linewidth=2.5, alpha=0.6)
-    axs[2].plot(t, result.ao_phase, label="Original AO Phase", color="red", linestyle="--", linewidth=1.5)
-    axs[2].plot(t, result.enhanced_phase, label="Enhanced Phase (AO + GRU)", color="blue", linewidth=2)
+    axs[2].plot(
+        t,
+        result.true_phase,
+        label="True Phase",
+        color="green",
+        linewidth=2.5,
+        alpha=0.6,
+    )
+    axs[2].plot(
+        t,
+        result.ao_phase,
+        label="Original AO Phase",
+        color="red",
+        linestyle="--",
+        linewidth=1.5,
+    )
+    axs[2].plot(
+        t,
+        result.enhanced_phase,
+        label="Enhanced Phase (AO + GRU)",
+        color="blue",
+        linewidth=2,
+    )
     axs[2].set_yticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
     axs[2].set_yticklabels([r"$-\pi$", r"$-\pi/2$", "0", r"$\pi/2$", r"$\pi$"])
     axs[2].set_ylabel("Gait Phase (Rad)")
@@ -230,8 +270,11 @@ def validate(csv_name: str) -> ValidationResult:
     y_pred = run_tflite_inference(x, MODEL_DIR / "gru_model_optimized.tflite")
 
     result = reconstruct_phases(
-        data, target_sin, target_cos,
-        pred_sin=y_pred[:, 0], pred_cos=y_pred[:, 1],
+        data,
+        target_sin,
+        target_cos,
+        pred_sin=y_pred[:, 0],
+        pred_cos=y_pred[:, 1],
     )
     plot_results(result)
     return result

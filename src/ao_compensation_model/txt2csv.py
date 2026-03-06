@@ -48,7 +48,7 @@ def convert_folder_to_csv(folder_path: str) -> None:
             df.to_csv(out_path, index=False, sep=";")
             print(f"Converted: {filename} -> {base_name}.csv")
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"Could not process {filename}: {e}")
 
     print("All files converted.")

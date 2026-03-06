@@ -64,7 +64,9 @@ def test_bandpass_filter_preserves_passband():
 def test_realtime_bandpass_filter():
     """RealTimeBandpassFilter should produce output for each sample."""
     filt = RealTimeBandpassFilter(lowcut=0.3, highcut=3.0, fs=100, order=4)
-    results = [filt.process_point(np.sin(2 * np.pi * 1.0 * i / 100)) for i in range(200)]
+    results = [
+        filt.process_point(np.sin(2 * np.pi * 1.0 * i / 100)) for i in range(200)
+    ]
     assert len(results) == 200
     assert all(isinstance(v, (float, np.floating)) for v in results)
 

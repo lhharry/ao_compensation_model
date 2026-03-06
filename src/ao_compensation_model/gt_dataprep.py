@@ -4,9 +4,9 @@ Reads a raw CSV, applies bandpass filtering, extracts the true gait phase,
 computes delta-phi targets, and appends them to a new CSV for training.
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from ao_compensation_model.definitions import (
     RAW_DATA_DIR,
@@ -85,9 +85,7 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
 
     axs[1].set_title("Step 2: Amplitude Envelope & Thresholding")
     axs[1].plot(t, amplitude, label="Amplitude Envelope", color="orange")
-    axs[1].axhline(
-        y=threshold, color="red", linestyle="--", label="Static Threshold"
-    )
+    axs[1].axhline(y=threshold, color="red", linestyle="--", label="Static Threshold")
     axs[1].fill_between(
         t,
         0,

@@ -3,12 +3,12 @@
 import numpy as np
 import pandas as pd
 
+from ao_compensation_model.definitions import WINDOW_SIZE
 from ao_compensation_model.training import (
     build_gru_model,
     compute_sample_weights,
     preprocess_one_csv,
 )
-from ao_compensation_model.definitions import WINDOW_SIZE, GRU_UNITS
 
 
 def test_compute_sample_weights_stable():
@@ -72,7 +72,7 @@ def test_preprocess_one_csv(tmp_path):
 
 
 def test_preprocess_one_csv_clips_domega(tmp_path):
-    """domega values should be clipped to [-20, 20]."""
+    """Domega values should be clipped to [-20, 20]."""
     n = 100
     df = pd.DataFrame(
         {
