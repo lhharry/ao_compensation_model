@@ -4,16 +4,16 @@ from pathlib import Path
 
 from loguru import logger
 
-from ao_compensation_model.definitions import DEFAULT_LOG_LEVEL, STATIONARY_THRESHOLD
+from ao_compensation_model.definitions import DEFAULT_LOG_LEVEL
 from ao_compensation_model.utils import setup_logger
 
 
-def _run_prep(file: str | None, threshold: float) -> None:
+def _run_prep(file: str | None, threshold: float | None) -> None:
     """Prepare ground-truth targets from raw sensor data."""
     from ao_compensation_model.definitions import RAW_DATA_DIR, TRAINING_DATA_DIR
     from ao_compensation_model.gt_dataprep import prepare_targets, visualize
 
-    logger.info(f"Stationary threshold: {threshold}")
+    logger.info(f"Stationary threshold: {'auto' if threshold is None else threshold}")
 
     if file is not None:
         csv_path = Path(file)
@@ -34,7 +34,7 @@ def _run_prep(file: str | None, threshold: float) -> None:
     logger.success("Data preparation complete.")
 
 
-def _run_train(file: str | None, threshold: float) -> None:
+def _run_train(file: str | None, threshold: float | None) -> None:
     """Train the GRU model."""
     from ao_compensation_model.training import train
 
@@ -43,7 +43,7 @@ def _run_train(file: str | None, threshold: float) -> None:
     logger.success("Training complete.")
 
 
-def _run_validate(file: str | None, threshold: float) -> None:
+def _run_validate(file: str | None, threshold: float | None) -> None:
     """Validate model on test data."""
     from ao_compensation_model.definitions import TEST_DATA_DIR
     from ao_compensation_model.validation import validate
@@ -63,7 +63,7 @@ def _run_validate(file: str | None, threshold: float) -> None:
     logger.success("Validation complete.")
 
 
-def _run_txt2csv(file: str | None, threshold: float) -> None:
+def _run_txt2csv(file: str | None, threshold: float | None) -> None:
     """Convert text sensor files to semicolon-delimited CSVs."""
     from ao_compensation_model.txt2csv import convert_folder_to_csv
 
@@ -98,7 +98,7 @@ _COMMANDS = {
 def main(
     command: str = "train",
     file: str | None = None,
-    threshold: float = STATIONARY_THRESHOLD,
+    threshold: float | None = None,
     log_level: str = DEFAULT_LOG_LEVEL,
     stderr_level: str = DEFAULT_LOG_LEVEL,
 ) -> None:
@@ -106,7 +106,7 @@ def main(
 
     :param command: One of 'prep', 'train', 'validate', or 'txt2csv'.
     :param file: Optional single CSV file (name or path) for 'prep'.
-    :param threshold: Stationary amplitude threshold for phase extraction.
+    :param threshold: Stationary amplitude threshold. *None* = auto.
     :param log_level: The log level to use.
     :param stderr_level: The std err level to use.
     :return: None

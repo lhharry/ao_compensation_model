@@ -11,7 +11,6 @@ import pandas as pd
 from ao_compensation_model.definitions import (
     RAW_DATA_DIR,
     SAMPLING_FREQ,
-    STATIONARY_THRESHOLD,
     TRAINING_DATA_DIR,
 )
 from ao_compensation_model.utils import (
@@ -22,7 +21,7 @@ from ao_compensation_model.utils import (
 
 
 def prepare_targets(
-    input_path, output_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD
+    input_path, output_path, fs=SAMPLING_FREQ, threshold=None
 ):
     """Process a single raw CSV and write the file with appended targets.
 
@@ -40,7 +39,7 @@ def prepare_targets(
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
 
     # Align AO phase so that its peak corresponds to Hip_x peak
-    aligned_phase, _ = align_ao_phase(
+    aligned_phase, _, _ = align_ao_phase(
         filtered_hip, ao_phase, threshold=threshold
     )
     tp_cos = np.cos(aligned_phase)
@@ -54,7 +53,7 @@ def prepare_targets(
     df.to_csv(output_path, index=False, sep=";")
 
 
-def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
+def visualize(input_path, fs=SAMPLING_FREQ, threshold=None):
     """Plot the full pipeline: raw signal, envelope, phase, and targets.
 
     :param input_path: Path to the raw CSV file.
@@ -67,7 +66,7 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
     raw_hip_angle = np.asarray(df["Hip_x"].values)
     ao_raw_phase = np.asarray(df["Hip_x_ao"].values)
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
-    aligned_phase, amplitude = align_ao_phase(
+    aligned_phase, amplitude, used_threshold = align_ao_phase(
         filtered_hip, ao_raw_phase, threshold=threshold
     )
     tp_cos = np.cos(aligned_phase)
@@ -84,12 +83,15 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=STATIONARY_THRESHOLD):
 
     axs[1].set_title("Step 2: Amplitude Envelope & Thresholding")
     axs[1].plot(t, amplitude, label="Amplitude Envelope", color="orange")
-    axs[1].axhline(y=threshold, color="red", linestyle="--", label="Static Threshold")
+    axs[1].axhline(
+        y=used_threshold, color="red", linestyle="--",
+        label=f"Threshold = {used_threshold:.4f}",
+    )
     axs[1].fill_between(
         t,
         0,
         amplitude,
-        where=(amplitude < threshold),
+        where=(amplitude < used_threshold),
         color="red",
         alpha=0.2,
         label="Detected as Stopped",

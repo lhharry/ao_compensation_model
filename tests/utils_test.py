@@ -122,7 +122,7 @@ def test_align_ao_phase_output_shape():
     filtered = bandpass_filter(signal, fs=fs)
     # Simulate an AO phase that wraps around [-pi, pi]
     ao_phase = np.mod(2 * np.pi * 1.0 * t + 0.5, 2 * np.pi) - np.pi
-    aligned, amplitude = align_ao_phase(filtered, ao_phase, dt=1 / fs)
+    aligned, amplitude, used_thr = align_ao_phase(filtered, ao_phase, dt=1 / fs)
     assert aligned.shape == filtered.shape
     assert amplitude.shape == filtered.shape
 
@@ -134,7 +134,7 @@ def test_align_ao_phase_bounded():
     signal = 10 * np.sin(2 * np.pi * 1.0 * t)
     filtered = bandpass_filter(signal, fs=fs)
     ao_phase = np.mod(2 * np.pi * 1.0 * t + 1.0, 2 * np.pi) - np.pi
-    aligned, _ = align_ao_phase(filtered, ao_phase, dt=1 / fs)
+    aligned, _, _ = align_ao_phase(filtered, ao_phase, dt=1 / fs)
     assert np.all(aligned >= -np.pi - 0.1)
     assert np.all(aligned <= np.pi + 0.1)
 
@@ -148,12 +148,34 @@ def test_align_ao_phase_sawtooth_fallback():
     # Deliberately bad AO: random noise
     rng = np.random.default_rng(42)
     bad_ao = rng.uniform(-np.pi, np.pi, len(t))
-    aligned, _ = align_ao_phase(filtered, bad_ao, dt=1 / fs, ao_error_threshold=0.5)
+    aligned, _, _ = align_ao_phase(filtered, bad_ao, dt=1 / fs, ao_error_threshold=0.5)
     # All non-zero segments should be within [-pi, pi] (sawtooth bounds)
     nonzero = aligned[aligned != 0]
     if len(nonzero) > 0:
         assert np.all(nonzero >= -np.pi - 1e-10)
         assert np.all(nonzero <= np.pi + 1e-10)
+
+
+def test_align_ao_phase_auto_threshold():
+    """When threshold=None, auto-compute from amplitude envelope at peaks."""
+    fs = 100
+    t = np.arange(0, 5, 1 / fs)
+    signal = 10 * np.sin(2 * np.pi * 1.0 * t)
+    filtered = bandpass_filter(signal, fs=fs)
+    ao_phase = np.mod(2 * np.pi * 1.0 * t + 0.5, 2 * np.pi) - np.pi
+    _, _, used_thr = align_ao_phase(filtered, ao_phase, dt=1 / fs, threshold=None)
+    assert used_thr > 0, "Auto threshold should be positive for a walking signal"
+
+
+def test_align_ao_phase_manual_threshold():
+    """When a manual threshold is given, it should be returned unchanged."""
+    fs = 100
+    t = np.arange(0, 5, 1 / fs)
+    signal = 10 * np.sin(2 * np.pi * 1.0 * t)
+    filtered = bandpass_filter(signal, fs=fs)
+    ao_phase = np.mod(2 * np.pi * 1.0 * t + 0.5, 2 * np.pi) - np.pi
+    _, _, used_thr = align_ao_phase(filtered, ao_phase, dt=1 / fs, threshold=0.42)
+    assert used_thr == 0.42
 
 
 def test_create_sliding_windows_stride():

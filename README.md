@@ -50,7 +50,7 @@ uv run python -m ao_compensation_model prep
 # Prepare a single file
 uv run python -m ao_compensation_model prep --file 20260304_17_13_22_stopgo.csv
 
-# Prepare with a custom stationary threshold (default: 0.083)
+# Prepare with a manual stationary threshold (default: auto)
 uv run python -m ao_compensation_model prep --file recording.csv --threshold 0.1
 ```
 
@@ -85,7 +85,7 @@ uv run python -m ao_compensation_model txt2csv --file /path/to/folder
 | Flag | Applies to | Description |
 |------|------------|-------------|
 | `--file` | `prep`, `validate`, `txt2csv` | `prep`: single CSV to process. `validate`: single test CSV. `txt2csv`: folder path. |
-| `--threshold` | `prep` | Amplitude threshold for stationary detection (default: `0.083`). |
+| `--threshold` | `prep` | Amplitude threshold for stationary detection. Omit or pass `auto` for automatic (default: `auto`). |
 | `--log-level` | all | Log level (`TRACE`, `DEBUG`, `INFO`, `SUCCESS`, `WARNING`, `ERROR`, `CRITICAL`). |
 | `--stderr-level` | all | Stderr log level. |
 

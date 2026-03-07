@@ -18,7 +18,7 @@ from ao_compensation_model.definitions import (
     ENCODING,
     LOG_DIR,
     SAMPLING_FREQ,
-    STATIONARY_THRESHOLD,
+    STATIONARY_THRESHOLD_RATIO,
 )
 
 # ---------------------------------------------------------------------------
@@ -85,10 +85,10 @@ def align_ao_phase(
     filtered_signal: np.ndarray,
     ao_phase: np.ndarray,
     dt: float = 1 / SAMPLING_FREQ,
-    threshold: float = STATIONARY_THRESHOLD,
+    threshold: float | None = None,
     window_time: float = 1,
     ao_error_threshold: float = 1.5,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Align AO phase to Hip_x peaks, falling back to sawtooth when AO is poor.
 
     For each gait cycle (peak-to-peak of filtered Hip_x):
@@ -102,9 +102,11 @@ def align_ao_phase(
     :param ao_phase: Raw Hip_x_ao phase signal (expected in [-pi, pi]).
     :param dt: Sampling period in seconds.
     :param threshold: Amplitude threshold for stationary detection.
+        *None* (default) = auto-compute as
+        ``STATIONARY_THRESHOLD_RATIO * median(envelope[peaks])``.
     :param window_time: Window length (seconds) for the RMS envelope.
     :param ao_error_threshold: Max RMS error (rad) before falling back to sawtooth.
-    :return: (aligned_phase, amplitude_envelope) arrays.
+    :return: (aligned_phase, amplitude_envelope, used_threshold) arrays + float.
     """
     min_distance = int(0.99 / (BANDPASS_HIGHCUT * dt))
     peaks, _ = find_peaks(filtered_signal, height=0, width=min_distance)
@@ -137,10 +139,19 @@ def align_ao_phase(
     )
     amplitude_envelope = np.sqrt(mean_squared)
 
+    # Auto-compute threshold from median peak amplitude when not specified
+    if threshold is None:
+        if len(peaks) > 0:
+            threshold = STATIONARY_THRESHOLD_RATIO * float(
+                np.median(amplitude_envelope[peaks])
+            )
+        else:
+            threshold = 0.0
+
     # Clamp to zero where stationary
     aligned_phase[amplitude_envelope < threshold] = 0
 
-    return aligned_phase, amplitude_envelope
+    return aligned_phase, amplitude_envelope, threshold
 
 
 def generate_gru_targets(

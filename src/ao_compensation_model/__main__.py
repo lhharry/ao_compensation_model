@@ -5,7 +5,6 @@ import argparse
 from ao_compensation_model.app import main
 from ao_compensation_model.definitions import (
     DEFAULT_LOG_LEVEL,
-    STATIONARY_THRESHOLD,
     LogLevel,
 )
 
@@ -25,10 +24,10 @@ if __name__ == "__main__":  # pragma: no cover
     )
     parser.add_argument(
         "--threshold",
-        default=STATIONARY_THRESHOLD,
-        help=f"Stationary amplitude threshold (default: {STATIONARY_THRESHOLD}).",
+        default=None,
+        help="Stationary amplitude threshold. Omit or pass 'auto' for automatic.",
         required=False,
-        type=float,
+        type=lambda v: None if v.lower() == "auto" else float(v),
     )
     parser.add_argument(
         "--log-level",
