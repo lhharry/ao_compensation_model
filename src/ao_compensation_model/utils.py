@@ -87,7 +87,7 @@ def align_ao_phase(
     dt: float = 1 / SAMPLING_FREQ,
     threshold: float | None = None,
     window_time: float = 1,
-    ao_error_threshold: float = 1.5,
+    ao_error_threshold: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Align AO phase to Hip_x peaks by a single global time-shift.
 
