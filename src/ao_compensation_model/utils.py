@@ -87,16 +87,15 @@ def align_ao_phase(
     dt: float = 1 / SAMPLING_FREQ,
     threshold: float | None = None,
     window_time: float = 1,
-    ao_error_threshold: float = 1.5,
+    ao_error_threshold: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """Align AO phase to Hip_x peaks, falling back to sawtooth when AO is poor.
+    """Align AO phase to Hip_x peaks by a single global time-shift.
 
-    For each gait cycle (peak-to-peak of filtered Hip_x):
-    1. Build a sawtooth reference from -pi to pi.
-    2. Unwrap and shift the AO phase so it starts at -pi.
-    3. If the RMS error between aligned AO and sawtooth exceeds
-       *ao_error_threshold*, use the sawtooth for that cycle;
-       otherwise keep the aligned AO (preserves real AO dynamics).
+    1. Find the 5th peak of the AO phase signal.
+    2. Find the nearest Hip_x (sawtooth) peak to that AO peak.
+    3. Compute the time-shift and ``np.roll`` the entire AO signal once.
+    4. Build per-cycle sawtooth references; if the per-cycle RMS error
+       exceeds *ao_error_threshold*, fall back to sawtooth for that cycle.
 
     :param filtered_signal: Bandpass-filtered Hip_x signal.
     :param ao_phase: Raw Hip_x_ao phase signal (expected in [-pi, pi]).
@@ -106,13 +105,21 @@ def align_ao_phase(
         ``STATIONARY_THRESHOLD_RATIO * median(envelope[peaks])``.
     :param window_time: Window length (seconds) for the RMS envelope.
     :param ao_error_threshold: Max RMS error (rad) before falling back to sawtooth.
-    :return: (aligned_phase, amplitude_envelope, used_threshold) arrays + float.
+    :return: (aligned_phase, amplitude_envelope, used_threshold, aligned_ao_full).
     """
     min_distance = int(0.99 / (BANDPASS_HIGHCUT * dt))
     peaks, _ = find_peaks(filtered_signal, height=0, width=min_distance)
+    ao_peaks, _ = find_peaks(ao_phase, height=0, width=min_distance)
+
+    # --- Global time-shift using the 5th AO peak ---
+    ref_idx = min(4, len(ao_peaks) - 1)  # 0-based index 9 = 10th peak
+    ao_ref_pos = ao_peaks[ref_idx]
+    # Nearest Hip_x (sawtooth) peak
+    nearest_hip_peak = peaks[np.argmin(np.abs(peaks - ao_ref_pos))]
+    time_shift = int(nearest_hip_peak - ao_ref_pos)
+    shifted_ao = np.roll(ao_phase, time_shift)
 
     aligned_phase = np.zeros_like(ao_phase)
-
     for i in range(len(peaks) - 1):
         start, end = peaks[i], peaks[i + 1]
         n_samples = end - start
@@ -120,16 +127,12 @@ def align_ao_phase(
         # Sawtooth reference: linear ramp from -pi to pi
         sawtooth = np.linspace(-np.pi, np.pi, n_samples)
 
-        # Aligned AO: shift so cycle starts at -pi, then wrap to [-pi, pi]
-        shifted = ao_phase[start:end] + (-np.pi - ao_phase[start])
-        aligned_ao = (shifted + np.pi) % (2 * np.pi) - np.pi
-
         # Per-cycle quality check
-        rms_error = np.sqrt(np.mean((aligned_ao - sawtooth) ** 2))
+        rms_error = np.sqrt(np.mean((shifted_ao[start:end] - sawtooth) ** 2))
         if rms_error > ao_error_threshold:
             aligned_phase[start:end] = sawtooth
         else:
-            aligned_phase[start:end] = aligned_ao
+            aligned_phase[start:end] = shifted_ao[start:end]
 
     # RMS amplitude envelope via moving average of squared signal
     window_size = max(1, int(window_time / dt))
