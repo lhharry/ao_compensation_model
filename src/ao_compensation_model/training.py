@@ -14,7 +14,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from tensorflow.keras.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
@@ -105,7 +105,7 @@ def train():
 
     # --- Fit scaler on the union of all files ---
     all_features = np.vstack([f for _, f, _ in file_data])
-    scaler = StandardScaler()
+    scaler = RobustScaler()
     scaler.fit(all_features)
     joblib.dump(scaler, scaler_path)
 
@@ -165,7 +165,7 @@ def train():
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE),
         loss={"phase": "mse", "omega": "mse"},
-        loss_weights={"phase": 1.0, "omega": 1.0},
+        loss_weights={"phase": 2.0, "omega": 1.0},
     )
 
     callbacks = [

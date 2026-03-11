@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from loguru import logger
+from scipy.interpolate import interp1d
 from scipy.signal import butter, filtfilt, find_peaks, lfilter, lfilter_zi
 
 from ao_compensation_model.definitions import (
@@ -155,6 +156,136 @@ def align_ao_phase(
     aligned_phase[amplitude_envelope < threshold] = 0
 
     return aligned_phase, amplitude_envelope, threshold
+
+
+def calculate_offline_omega(
+    theta_il: np.ndarray,
+    time_array: np.ndarray,
+    fs: int = SAMPLING_FREQ,
+) -> np.ndarray:
+    """Calculate highly accurate offline fundamental angular frequency (omega).
+
+    Uses zero-phase filtering and peak-based stride detection to produce a
+    smooth, continuous omega curve suitable as a ground-truth target.
+
+    :param theta_il: 1-D array of inter-limb hip flexion angles.
+    :param time_array: 1-D array of corresponding timestamps in seconds.
+    :param fs: Sampling frequency in Hz.
+    :return: 1-D array of continuous offline angular frequency (rad/s).
+    """
+    # Step 1: Zero-phase low-pass filtering (4th order Butterworth, 10 Hz)
+    nyquist = 0.5 * fs
+    cutoff = 10 / nyquist
+    b, a = butter(4, cutoff, btype="low")
+    theta_filtered = filtfilt(b, a, theta_il)
+
+    # Step 2: Detect gait events (peaks = maximum hip flexion)
+    min_stride_samples = int(0.5 * fs)
+    threshold = float(np.percentile(theta_filtered, 75))
+    peaks, _ = find_peaks(
+        theta_filtered, distance=min_stride_samples, height=threshold
+    )
+
+    if len(peaks) < 2:
+        return np.zeros_like(time_array)
+
+    # Step 3: Stride period and discrete omega
+    peak_times = time_array[peaks]
+    stride_periods = np.diff(peak_times)
+    omega_discrete = 2 * np.pi / stride_periods
+
+    # Step 4: Cubic interpolation for a continuous omega curve
+    midpoints = peak_times[:-1] + stride_periods / 2
+    interp_func = interp1d(
+        midpoints, omega_discrete, kind="cubic",
+        bounds_error=False, fill_value="extrapolate",
+    )
+    omega_continuous = interp_func(time_array)
+
+    # Step 5: Zero out non-walking segments
+    max_stride_duration = 2.5  # seconds
+    for i, period in enumerate(stride_periods):
+        if period > max_stride_duration:
+            omega_continuous[peaks[i] : peaks[i + 1]] = 0.0
+
+    omega_continuous[: peaks[0]] = 0.0
+    omega_continuous[peaks[-1] :] = 0.0
+
+    # Prevent negative frequencies from spline overshoot
+    omega_continuous = np.maximum(omega_continuous, 0.0)
+
+    return omega_continuous
+
+
+def align_omega(
+    filtered_signal: np.ndarray,
+    ao_omega: np.ndarray,
+    time_array: np.ndarray,
+    dt: float = 1 / SAMPLING_FREQ,
+    fs: int = SAMPLING_FREQ,
+    omega_error_threshold: float = 1.0,
+    threshold: float | None = None,
+    window_time: float = 1,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Align AO omega to the offline ground-truth with per-cycle quality check.
+
+    For each stride cycle the RMS error between the AO-provided omega and the
+    offline reference is evaluated.  If the error exceeds
+    *omega_error_threshold* the cycle is replaced by the offline omega;
+    otherwise the (potentially more precise) AO omega is kept.
+
+    :param filtered_signal: Bandpass-filtered Hip_x signal (used for peak
+        detection and amplitude envelope).
+    :param ao_omega: Raw AO angular-frequency estimate from the device.
+    :param time_array: 1-D array of timestamps in seconds.
+    :param dt: Sampling period in seconds.
+    :param fs: Sampling frequency in Hz.
+    :param omega_error_threshold: Max per-cycle RMS error (rad/s) before
+        falling back to the offline omega.
+    :param threshold: Amplitude threshold for stationary detection.
+        *None* = auto-compute.
+    :param window_time: Window length (seconds) for the RMS envelope.
+    :return: (aligned_omega, amplitude_envelope, used_threshold).
+    """
+    # Compute the offline reference omega
+    theta_il = filtered_signal  # inter-limb angle approximated by filtered Hip_x
+    offline_omega = calculate_offline_omega(theta_il, time_array, fs)
+
+    # Hip_x peaks define stride boundaries
+    min_distance = int(0.99 / (BANDPASS_HIGHCUT * dt))
+    peaks, _ = find_peaks(filtered_signal, height=0, width=min_distance)
+
+    aligned_omega = np.copy(offline_omega)
+
+    # Per-cycle quality check
+    for i in range(len(peaks) - 1):
+        start, end = peaks[i], peaks[i + 1]
+        rms_error = np.sqrt(np.mean((ao_omega[start:end] - offline_omega[start:end]) ** 2))
+        if rms_error <= omega_error_threshold:
+            # AO omega is close enough — keep it
+            aligned_omega[start:end] = ao_omega[start:end]
+        # else: offline_omega already in place
+
+    # RMS amplitude envelope (same as align_ao_phase)
+    window_size = max(1, int(window_time / dt))
+    squared_signal = filtered_signal ** 2
+    mean_squared = np.convolve(
+        squared_signal, np.ones(window_size) / window_size, mode="same"
+    )
+    amplitude_envelope = np.sqrt(mean_squared)
+
+    if threshold is None:
+        if len(peaks) > 0:
+            threshold = STATIONARY_THRESHOLD_RATIO * float(
+                np.median(amplitude_envelope[peaks])
+            )
+        else:
+            threshold = 0.0
+
+    # Zero out stationary segments
+    aligned_omega[amplitude_envelope < threshold] = 0.0
+
+    return aligned_omega, amplitude_envelope, threshold
 
 
 def generate_gru_targets(
