@@ -47,9 +47,9 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     df = pd.read_csv(csv_path, sep=";")
 
     raw_angle = np.asarray(df["Hip_x"].values)
-    angular_velocity = np.asarray(df["Hip_x_vel"].values)
+    angular_velocity = np.asarray(df["Hip_vel"].values)
 
-    omega = np.asarray(df["Hip_x_omega"].values)
+    omega = np.asarray(df["target_omega"].values)
     target_sin = np.asarray(df["target_sin"].values)
     target_cos = np.asarray(df["target_cos"].values)
     targets = np.column_stack([target_sin, target_cos, omega])
