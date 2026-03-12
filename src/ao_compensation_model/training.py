@@ -4,7 +4,9 @@ Loads labelled CSV files, fits a StandardScaler, trains a GRU model with
 sample weighting, and exports the best model as an optimized TFLite file.
 """
 
+import io
 import os
+from datetime import date
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
@@ -14,6 +16,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from loguru import logger
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from tensorflow.keras.callbacks import (
     EarlyStopping,
@@ -35,7 +38,7 @@ from ao_compensation_model.definitions import (
     VAL_SPLIT,
     WINDOW_SIZE,
 )
-from ao_compensation_model.utils import create_sliding_windows
+from ao_compensation_model.utils import create_sliding_windows, setup_logger
 
 
 def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -46,7 +49,7 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     """
     df = pd.read_csv(csv_path, sep=";")
 
-    raw_angle = np.asarray(df["Hip_x"].values)
+    raw_angle = np.asarray(df["filter_hip_x"].values)
     angular_velocity = np.asarray(df["Hip_vel"].values)
 
     omega = np.asarray(df["target_omega"].values)
@@ -85,6 +88,23 @@ def build_gru_model(
     omega_out = Dense(units=1, activation="linear", name="omega")(x)
     return Model(inputs=inp, outputs={"phase": phase_normalized, "omega": omega_out})
 
+class EpochLogger(tf.keras.callbacks.Callback):
+    """Log phase and omega validation losses after every epoch."""
+
+    def on_train_begin(self, logs=None):
+        logger.info("Training started.")
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        logger.info(
+            "Epoch {:3d} | val_loss: {:.6f}  val_phase_loss: {:.6f}  val_omega_loss: {:.6f}",
+            epoch + 1,
+            logs.get("val_loss", float("nan")),
+            logs.get("val_phase_loss", float("nan")),
+            logs.get("val_omega_loss", float("nan")),
+        )
+
+
 def temporal_smoothness_loss(y_true, y_pred):
     """Penalize jerky phase predictions."""
     diff = y_pred[:, 1:, :] - y_pred[:, :-1, :]
@@ -102,6 +122,7 @@ def combined_phase_loss(y_true, y_pred):
 def train():
     """Run the full training pipeline: load data, train, and export TFLite."""
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    today_str = date.today().strftime("%Y_%m_%d")
     model_path = MODEL_DIR / "gru_model.h5"
     scaler_path = MODEL_DIR / "scaler.pkl"
     tflite_path = MODEL_DIR / "gru_model_optimized.tflite"
@@ -188,6 +209,19 @@ def train():
         loss_weights={"phase": 2.0, "omega": 1.0},
     )
 
+    # --- Log model structure and parameter counts ---
+    summary_buf = io.StringIO()
+    model.summary(print_fn=lambda line: summary_buf.write(line + "\n"))
+    logger.info("Model architecture:\n{}", summary_buf.getvalue())
+    trainable_params = sum(int(tf.size(w)) for w in model.trainable_weights)
+    non_trainable_params = sum(int(tf.size(w)) for w in model.non_trainable_weights)
+    logger.info(
+        "Parameters — trainable: {}  non-trainable: {}  total: {}",
+        trainable_params,
+        non_trainable_params,
+        trainable_params + non_trainable_params,
+    )
+
     callbacks = [
         ReduceLROnPlateau(
             monitor="val_loss", factor=0.5, patience=5, min_lr=1e-6, verbose=1
@@ -201,9 +235,10 @@ def train():
             save_best_only=True,
             verbose=1,
         ),
+        EpochLogger(),
     ]
 
-    model.fit(
+    history = model.fit(
         x_train,
         {"phase": y_train_phase, "omega": y_train_omega},
         epochs=MAX_EPOCHS,
@@ -215,8 +250,20 @@ def train():
         callbacks=callbacks,
     )
 
+    # --- Rename saved checkpoint to include date and best val loss ---
+    best_val_loss = min(history.history["val_loss"])
+    named_model_path = MODEL_DIR / f"gru_model_{today_str}_val{best_val_loss:.4f}.h5"
+    named_tflite_path = MODEL_DIR / f"gru_model_{today_str}_val{best_val_loss:.4f}.tflite"
+    if model_path.exists():
+        model_path.rename(named_model_path)
+        logger.info(
+            "Best model saved as: {} (val_loss={:.6f})",
+            named_model_path.name,
+            best_val_loss,
+        )
+
     # --- Export to TFLite ---
-    best_model = tf.keras.models.load_model(str(model_path), compile=False)
+    best_model = tf.keras.models.load_model(str(named_model_path), compile=False)
     inference_model = build_gru_model(WINDOW_SIZE, x_train.shape[2], batch_size=1)
     inference_model.set_weights(best_model.get_weights())
 
@@ -224,9 +271,11 @@ def train():
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_model = converter.convert()
 
-    with open(tflite_path, "wb") as f:
+    with open(named_tflite_path, "wb") as f:
         f.write(tflite_model)
+    logger.info("TFLite model saved as: {}", named_tflite_path.name)
 
 
 if __name__ == "__main__":
+    setup_logger()
     train()
