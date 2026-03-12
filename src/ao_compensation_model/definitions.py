@@ -25,7 +25,7 @@ ENCODING: str = "utf-8"
 DATE_FORMAT = "%Y-%m-%d_%H-%M-%S"
 
 # --- Signal Processing ---
-SAMPLING_FREQ: int = 100
+SAMPLING_FREQ: int = 300
 BANDPASS_LOWCUT: float = 0.3
 BANDPASS_HIGHCUT: float = 3.0
 BANDPASS_ORDER: int = 4
@@ -34,11 +34,11 @@ STATIONARY_THRESHOLD_RATIO: float = 0.3
 
 # --- GRU Model ---
 WINDOW_SIZE: int = 100
-GRU_UNITS: int = 64
+GRU_UNITS: int = 128
 DROPOUT_RATE: float = 0.2
 BATCH_SIZE: int = 64
 MAX_EPOCHS: int = 100
-LEARNING_RATE: float = 0.001
+LEARNING_RATE: float = 0.0003
 VAL_SPLIT: float = 0.2
 
 

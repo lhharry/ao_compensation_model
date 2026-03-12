@@ -328,7 +328,7 @@ def create_sliding_windows(
     x_windows, y_windows = [], []
     for i in range(0, len(data) - window_size, stride):
         x_windows.append(data[i : i + window_size])
-        y_windows.append(target[i + window_size])
+        y_windows.append(target[i : i + window_size])
     return np.array(x_windows), np.array(y_windows)
 
 

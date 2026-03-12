@@ -76,15 +76,28 @@ def build_gru_model(
     x = GRU(
         units=GRU_UNITS,
         recurrent_activation="sigmoid",
-        return_sequences=False,
+        return_sequences=True,
         dropout=DROPOUT_RATE,
         recurrent_dropout=DROPOUT_RATE,
     )(inp)
     phase_out = Dense(units=2, activation="linear")(x)
-    phase_normalized = UnitNormalization(axis=1, name="phase")(phase_out)
+    phase_normalized = UnitNormalization(axis=-1, name="phase")(phase_out)
     omega_out = Dense(units=1, activation="linear", name="omega")(x)
     return Model(inputs=inp, outputs={"phase": phase_normalized, "omega": omega_out})
 
+def temporal_smoothness_loss(y_true, y_pred):
+    """Penalize jerky phase predictions."""
+    diff = y_pred[:, 1:, :] - y_pred[:, :-1, :]
+    return tf.reduce_mean(tf.square(diff))
+
+def cosine_phase_loss(y_true, y_pred):
+    # y_true/y_pred: (batch, window_size, 2)
+    return 1.0 - tf.reduce_mean(tf.reduce_sum(y_true * y_pred, axis=-1), axis=-1)
+
+def combined_phase_loss(y_true, y_pred):
+    phase_loss = cosine_phase_loss(y_true, y_pred)
+    smooth_loss = temporal_smoothness_loss(y_true, y_pred)
+    return phase_loss + 0.1 * smooth_loss  # 权重可以调
 
 def train():
     """Run the full training pipeline: load data, train, and export TFLite."""
@@ -125,12 +138,14 @@ def train():
         if len(x_file) == 0:
             continue
 
-        if i in val_indices:
-            x_val_list.append(x_file)
-            y_val_list.append(y_file)
-        else:
-            x_train_list.append(x_file)
-            y_train_list.append(y_file)
+        n = len(x_file)
+        gap = WINDOW_SIZE
+        split = int(n * 0.8)
+        
+        x_train_list.append(x_file[:split])
+        y_train_list.append(y_file[:split])
+        x_val_list.append(x_file[split + gap:])
+        y_val_list.append(y_file[split + gap:])
 
     if not x_train_list:
         raise ValueError(
@@ -150,21 +165,26 @@ def train():
     x_train, y_train = x_train[idx], y_train[idx]
 
     # --- Train ---
-    y_train_phase = y_train[:, :2]
-    y_train_omega_raw = y_train[:, 2:3]
-    y_val_phase = y_val[:, :2]
-    y_val_omega_raw = y_val[:, 2:3]
+    y_train_phase = y_train[:, :, :2]
+    y_train_omega_raw = y_train[:, :, 2:3]
+    y_val_phase = y_val[:, :, :2]
+    y_val_omega_raw = y_val[:, :, 2:3]
 
     # Normalize omega targets so loss scale matches phase (~[-1,1])
     omega_scaler = StandardScaler()
-    y_train_omega = omega_scaler.fit_transform(y_train_omega_raw)
-    y_val_omega = omega_scaler.transform(y_val_omega_raw)
+    orig_shape = y_train_omega_raw.shape  # (N, window_size, 1)
+    y_train_omega = omega_scaler.fit_transform(
+        y_train_omega_raw.reshape(-1, 1)
+    ).reshape(orig_shape)
+    y_val_omega = omega_scaler.transform(
+        y_val_omega_raw.reshape(-1, 1)
+    ).reshape(y_val_omega_raw.shape)
     joblib.dump(omega_scaler, MODEL_DIR / "omega_scaler.pkl")
 
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE),
-        loss={"phase": "mse", "omega": "mse"},
+        loss={"phase": combined_phase_loss, "omega": "mse"},
         loss_weights={"phase": 2.0, "omega": 1.0},
     )
 
