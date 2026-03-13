@@ -37,6 +37,7 @@ from ao_compensation_model.definitions import (
     TRAINING_DATA_DIR,
     VAL_SPLIT,
     WINDOW_SIZE,
+    STRIDE
 )
 from ao_compensation_model.utils import create_sliding_windows, setup_logger
 
@@ -153,7 +154,7 @@ def train():
 
     for i, (name, features, targets) in enumerate(file_data):
         features_scaled = np.asarray(scaler.transform(features))
-        x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE, stride=50)
+        x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE, STRIDE)
         if len(x_file) == 0:
             continue
 
