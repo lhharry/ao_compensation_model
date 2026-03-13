@@ -143,18 +143,23 @@ def reconstruct_phases(
     :param pred_omega: Predicted omega values.
     :return: A :class:`ValidationResult` with all aligned arrays.
     """
-    offset = WINDOW_SIZE
+    
+    offset = WINDOW_SIZE - 1
+    n_pred = len(pred_sin)
     ao_phase = data["ao_gait_phase"]
 
     return ValidationResult(
-        time_axis=np.arange(len(ao_phase) - offset) / SAMPLING_FREQ,
-        raw_angle=data["raw_angle"][offset:],
-        ao_phase=ao_phase[offset:],
-        true_phase=np.arctan2(target_sin[offset:], target_cos[offset:]),
+        time_axis=np.arange(n_pred) / SAMPLING_FREQ,
+        raw_angle=data["raw_angle"][offset : offset + n_pred],
+        ao_phase=ao_phase[offset : offset + n_pred],
+        true_phase=np.arctan2(
+            target_sin[offset : offset + n_pred],
+            target_cos[offset : offset + n_pred],
+        ),
         enhanced_phase=np.arctan2(pred_sin, pred_cos),
-        target_sin=target_sin[offset:],
-        target_cos=target_cos[offset:],
-        target_omega=target_omega[offset:],
+        target_sin=target_sin[offset : offset + n_pred],
+        target_cos=target_cos[offset : offset + n_pred],
+        target_omega=target_omega[offset : offset + n_pred],
         pred_sin=pred_sin,
         pred_cos=pred_cos,
         pred_omega=pred_omega,
