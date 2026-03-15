@@ -159,7 +159,7 @@ def align_ao_phase(
 
 
 def calculate_offline_omega(
-    theta_il: np.ndarray,
+    theta: np.ndarray,
     time_array: np.ndarray,
     fs: int = SAMPLING_FREQ,
 ) -> np.ndarray:
@@ -168,7 +168,7 @@ def calculate_offline_omega(
     Uses zero-phase filtering and peak-based stride detection to produce a
     smooth, continuous omega curve suitable as a ground-truth target.
 
-    :param theta_il: 1-D array of inter-limb hip flexion angles.
+    :param theta: 1-D array of hip angles.
     :param time_array: 1-D array of corresponding timestamps in seconds.
     :param fs: Sampling frequency in Hz.
     :return: 1-D array of continuous offline angular frequency (rad/s).
@@ -177,7 +177,7 @@ def calculate_offline_omega(
     nyquist = 0.5 * fs
     cutoff = 10 / nyquist
     b, a = butter(4, cutoff, btype="low")
-    theta_filtered = filtfilt(b, a, theta_il)
+    theta_filtered = filtfilt(b, a, theta)
 
     # Step 2: Detect gait events (peaks = maximum hip flexion)
     min_stride_samples = int(0.5 * fs)
@@ -311,26 +311,37 @@ def generate_gru_targets(
 # ---------------------------------------------------------------------------
 
 
+# def create_sliding_windows(
+#     data: np.ndarray,
+#     target: np.ndarray,
+#     window_size: int,
+#     stride: int = 1,
+# ) -> tuple[np.ndarray, np.ndarray]:
+#     """Create overlapping sliding windows from time-series data.
+
+#     :param data: Input feature array of shape (T, F).
+#     :param target: Target array of shape (T, ...).
+#     :param window_size: Number of time steps per window.
+#     :param stride: Step size between windows.
+#     :return: (X_windows, y_windows) arrays.
+#     """
+#     x_windows, y_windows = [], []
+#     for i in range(0, len(data) - window_size, stride):
+#         x_windows.append(data[i : i + window_size])
+#         y_windows.append(target[i : i + window_size])
+#     return np.array(x_windows), np.array(y_windows)
 def create_sliding_windows(
     data: np.ndarray,
     target: np.ndarray,
     window_size: int,
     stride: int = 1,
+    target_lead: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Create overlapping sliding windows from time-series data.
-
-    :param data: Input feature array of shape (T, F).
-    :param target: Target array of shape (T, ...).
-    :param window_size: Number of time steps per window.
-    :param stride: Step size between windows.
-    :return: (X_windows, y_windows) arrays.
-    """
     x_windows, y_windows = [], []
-    for i in range(0, len(data) - window_size, stride):
+    for i in range(0, len(data) - window_size - target_lead, stride):
         x_windows.append(data[i : i + window_size])
-        y_windows.append(target[i : i + window_size])
+        y_windows.append(target[i : i + window_size + target_lead])
     return np.array(x_windows), np.array(y_windows)
-
 
 # ---------------------------------------------------------------------------
 # Logging

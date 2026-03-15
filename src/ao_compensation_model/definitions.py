@@ -33,15 +33,15 @@ STATIONARY_THRESHOLD: float = 0.05
 STATIONARY_THRESHOLD_RATIO: float = 0.3
 
 # --- GRU Model ---
-WINDOW_SIZE: int = 300
-STRIDE: int = 50
+WINDOW_SIZE: int = 100
+STRIDE: int = 10
 GRU_UNITS: int = 128
-DROPOUT_RATE: float = 0.2
-BATCH_SIZE: int = 16
+DROPOUT_RATE: float = 0.3
+BATCH_SIZE: int = 128
 MAX_EPOCHS: int = 100
-LEARNING_RATE: float = 0.0005
+LEARNING_RATE: float = 0.001
 VAL_SPLIT: float = 0.2
-
+TARGET_LEAD: int = 0
 
 @dataclass
 class LogLevel:

@@ -17,15 +17,17 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from loguru import logger
-from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
+from tensorflow.keras.losses import Huber, CosineSimilarity
 from tensorflow.keras.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization
+from tensorflow.keras.layers import GRU, Dense, Input, LayerNormalization, UnitNormalization
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.regularizers import l2
 
 from ao_compensation_model.definitions import (
     BATCH_SIZE,
@@ -34,8 +36,8 @@ from ao_compensation_model.definitions import (
     LEARNING_RATE,
     MAX_EPOCHS,
     MODEL_DIR,
+    TARGET_LEAD,
     TRAINING_DATA_DIR,
-    VAL_SPLIT,
     WINDOW_SIZE,
     STRIDE
 )
@@ -51,16 +53,17 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     df = pd.read_csv(csv_path, sep=";")
 
     raw_angle = np.asarray(df["filter_hip_x"].values)
-    angular_velocity = np.asarray(df["Hip_vel"].values)
+    angular_velocity = np.asarray(df["filter_hip_vel"].values)
 
     omega = np.asarray(df["target_omega"].values)
-    target_sin = np.asarray(df["target_sin"].values)
-    target_cos = np.asarray(df["target_cos"].values)
-    targets = np.column_stack([target_sin, target_cos, omega])
+    target_sin = np.asarray(df["target_sin"].values).copy()
+    target_cos = np.asarray(df["target_cos"].values).copy()
 
+    targets = np.column_stack([target_sin, target_cos, omega])
     features = np.column_stack(
         [raw_angle, angular_velocity]
     )
+
     return features, targets
 
 
@@ -77,11 +80,11 @@ def build_gru_model(
     :return: Keras Model (uncompiled).
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
-    x = GRU(units=GRU_UNITS, recurrent_activation="sigmoid", return_sequences=True)(inp)
-    x = GRU(units=64, recurrent_activation="sigmoid", return_sequences=False)(x)
-    phase_out = Dense(units=2, activation="linear")(x)          # (batch, 2)
+    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(inp)
+    x = LayerNormalization(name="gru_norm")(x)
+    phase_out = Dense(units=2, activation="linear",kernel_regularizer=l2(0.001))(x)
     phase_normalized = UnitNormalization(axis=-1, name="phase")(phase_out)
-    omega_out = Dense(units=1, activation="linear", name="omega")(x)  # (batch, 1)
+    omega_out = Dense(units=1, activation="linear", name="omega",kernel_regularizer=l2(0.001))(x)
     return Model(inputs=inp, outputs={"phase": phase_normalized, "omega": omega_out})
 
 class EpochLogger(tf.keras.callbacks.Callback):
@@ -89,6 +92,19 @@ class EpochLogger(tf.keras.callbacks.Callback):
 
     def on_train_begin(self, logs=None):
         logger.info("Training started.")
+        logger.info(
+            "Hyperparameters:\n"
+            f"  WINDOW_SIZE: {WINDOW_SIZE}\n"
+            f"  STRIDE: {STRIDE}\n"
+            f"  TARGET_LEAD: {TARGET_LEAD}\n"
+            f"  GRU_UNITS: {GRU_UNITS}\n"
+            f"  DROPOUT_RATE: {DROPOUT_RATE}\n"
+            f"  BATCH_SIZE: {BATCH_SIZE}\n"
+            f"  MAX_EPOCHS: {MAX_EPOCHS}\n"
+            f"  LEARNING_RATE: {LEARNING_RATE}\n"
+            f"  TRAINING_DATA_DIR: {TRAINING_DATA_DIR}\n"
+            f"  MODEL_DIR: {MODEL_DIR}"
+        )
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
@@ -100,25 +116,11 @@ class EpochLogger(tf.keras.callbacks.Callback):
             logs.get("val_omega_loss", float("nan")),
         )
 
-
-def temporal_smoothness_loss(y_true, y_pred):
-    """Penalize jerky phase predictions."""
-    diff = (y_pred - y_true)[:, 1:] - (y_pred - y_true)[:, :-1]
-    return tf.reduce_mean(tf.square(diff))
-
-def cosine_phase_loss(y_true, y_pred):
-    # y_true/y_pred: (batch, window_size, 2)
-    return 1.0 - tf.reduce_mean(tf.reduce_sum(y_true * y_pred, axis=-1), axis=-1)
-
-def combined_phase_loss(y_true, y_pred):
-    phase_loss = cosine_phase_loss(y_true, y_pred)
-    smooth_loss = temporal_smoothness_loss(y_true, y_pred)
-    return phase_loss + 0.5 * smooth_loss
-
 def train():
     """Run the full training pipeline: load data, train, and export TFLite."""
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     today_str = date.today().strftime("%Y_%m_%d")
+    time_str = pd.Timestamp.now().strftime("%H_%M")
     model_path = MODEL_DIR / "gru_model.keras"
     scaler_path = MODEL_DIR / "scaler.pkl"
 
@@ -134,31 +136,29 @@ def train():
 
     # --- File-level train/val split to prevent data leakage ---
     rng = np.random.default_rng(42)
-    n_files = len(file_data)
-    n_val = max(1, round(n_files * VAL_SPLIT))
-    indices = rng.permutation(n_files)
-    val_indices = set(indices[:n_val].tolist())
-    train_indices = set(indices[n_val:].tolist())
+    val_subjects = {"L"}
 
     # --- Fit scaler on training files  ---
     train_features_for_fit = np.vstack(
-        [f for j, (_, f, _) in enumerate(file_data) if j in train_indices]
+        [f for j, (_, f, _) in enumerate(file_data)
+         if csv_files[j].name.split("_")[3][0] not in val_subjects]
     )
     scaler = RobustScaler()
     scaler.fit(train_features_for_fit)
     joblib.dump(scaler, scaler_path)
 
-    # --- Build windows: whole files go to train or val ---
+     # --- Build windows: whole files go to train or val ---
     x_train_list, y_train_list = [], []
     x_val_list, y_val_list = [], []
 
     for i, (name, features, targets) in enumerate(file_data):
         features_scaled = np.asarray(scaler.transform(features))
-        x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE, STRIDE)
+        x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE, STRIDE, TARGET_LEAD)
         if len(x_file) == 0:
             continue
 
-        if i in val_indices:
+        subject = csv_files[i].name.split("_")[3][0]
+        if subject in val_subjects:
             x_val_list.append(x_file)
             y_val_list.append(y_file)
         else:
@@ -182,23 +182,22 @@ def train():
     idx = rng.permutation(len(x_train))
     x_train, y_train = x_train[idx], y_train[idx]
 
-    # --- Targets: only the last timestep per window (return_sequences=False) ---
     y_train_phase = y_train[:, -1, :2]         # (N, 2)
     y_train_omega_raw = y_train[:, -1, 2:3]    # (N, 1)
     y_val_phase = y_val[:, -1, :2]
     y_val_omega_raw = y_val[:, -1, 2:3]
 
     # Normalize omega targets so loss scale matches phase (~[-1,1])
-    omega_scaler = StandardScaler()
+    omega_scaler = RobustScaler()
     y_train_omega = omega_scaler.fit_transform(y_train_omega_raw)  # (N, 1)
     y_val_omega = omega_scaler.transform(y_val_omega_raw)
     joblib.dump(omega_scaler, MODEL_DIR / "omega_scaler.pkl")
 
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
     model.compile(
-        optimizer=Adam(learning_rate=LEARNING_RATE),
-        loss={"phase": cosine_phase_loss, "omega": "mse"},
-        loss_weights={"phase": 1.0, "omega": 1.0},
+        optimizer=Adam(learning_rate=LEARNING_RATE,clipnorm=1.0),
+        loss={"phase": "mse", "omega": Huber(delta=1.0)},
+        loss_weights={"phase": 3.0, "omega": 1.0},
     )
 
     # --- Log model structure and parameter counts ---
@@ -216,10 +215,10 @@ def train():
 
     callbacks = [
         ReduceLROnPlateau(
-            monitor="val_loss", factor=0.5, patience=5, min_lr=1e-6, verbose=1
+            monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6, verbose=1
         ),
         EarlyStopping(
-            monitor="val_loss", patience=8, restore_best_weights=True, verbose=1
+            monitor="val_loss", patience=5, restore_best_weights=True, verbose=1
         ),
         ModelCheckpoint(
             filepath=str(model_path),
@@ -229,12 +228,15 @@ def train():
         ),
         EpochLogger(),
     ]
+    last_sin = y_train[:, -1, 0]
+    sample_weights = np.where(last_sin == 0, 0.1, 1.0)
 
     history = model.fit(
         x_train,
         {"phase": y_train_phase, "omega": y_train_omega},
         epochs=MAX_EPOCHS,
         batch_size=BATCH_SIZE,
+        sample_weight=sample_weights,
         validation_data=(
             x_val,
             {"phase": y_val_phase, "omega": y_val_omega},
@@ -244,18 +246,21 @@ def train():
 
     # --- Rename saved checkpoint to include date and best val loss ---
     best_val_loss = min(history.history["val_loss"])
-    named_model_path = MODEL_DIR / f"{today_str}_{best_val_loss:.4f}" / f"gru_model.keras"
-    named_tflite_path = MODEL_DIR / f"{today_str}_{best_val_loss:.4f}" / f"gru_model_edge.tflite"
+    best_model_path = MODEL_DIR / f"{today_str}_{time_str}_{best_val_loss:.4f}"
+    os.makedirs(best_model_path)
+    best_model = best_model_path/ f"gru_model.keras"
+    tflite_path = best_model_path / f"gru_model_edge.tflite"
+
     if model_path.exists():
-        model_path.rename(named_model_path)
+        model_path.rename(best_model)
         logger.info(
             "Best model saved as: {} (val_loss={:.6f})",
-            named_model_path.name,
+            best_model.name,
             best_val_loss,
         )
 
     # --- Export to TFLite ---
-    best_model = tf.keras.models.load_model(str(named_model_path), compile=False)
+    best_model = tf.keras.models.load_model(str(best_model), compile=False)
     inference_model = build_gru_model(WINDOW_SIZE, x_train.shape[2], batch_size=1)
     inference_model.set_weights(best_model.get_weights())
 
@@ -263,10 +268,11 @@ def train():
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_model = converter.convert()
 
-    with open(named_tflite_path, "wb") as f:
+    with open(tflite_path, "wb") as f:
         f.write(tflite_model)
-    logger.info("TFLite model saved as: {}", named_tflite_path.name)
-
+    logger.info("TFLite model saved as: {}", tflite_path.name)
+    joblib.dump(scaler, str(best_model_path / "scaler.pkl"))
+    joblib.dump(omega_scaler, str(best_model_path / "omega_scaler.pkl"))
 
 if __name__ == "__main__":
     setup_logger()

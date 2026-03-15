@@ -13,13 +13,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from definitions import BANDPASS_HIGHCUT, BANDPASS_LOWCUT, BANDPASS_ORDER, SAMPLING_FREQ
 
 # --- Folder containing the CSV files (searched recursively) ---
-INPUT_FOLDER = Path(__file__).resolve().parent / "dataset" / "training"
+INPUT_FOLDER = Path(__file__).resolve().parent / "dataset" / "test"
 
 
 class RealTimeBandpassFilter:
     """Causal bandpass filter for real-time, sample-by-sample processing."""
 
-    def __init__(self, lowcut: float, highcut: float, fs: int, order: int = 5):
+    def __init__(self, lowcut: float, highcut: float, fs: int, order: int = 3):
         nyq = 0.5 * fs
         low = lowcut / nyq
         high = highcut / nyq
@@ -51,7 +51,7 @@ else:
 
         raw_hip_angle = df["Hip_x"].to_numpy(dtype=float)
         rt_filter = RealTimeBandpassFilter(
-            BANDPASS_LOWCUT, BANDPASS_HIGHCUT, SAMPLING_FREQ, BANDPASS_ORDER
+            BANDPASS_LOWCUT, BANDPASS_HIGHCUT, SAMPLING_FREQ, 1
         )
         df["filter_hip_x"] = np.array(
             [rt_filter.process_point(x) for x in raw_hip_angle]
