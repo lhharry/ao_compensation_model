@@ -1,0 +1,11 @@
+2026-03-15 20:41:31.189 | INFO     | ao_compensation_model.utils:setup_logger:387 - Logging to 'data\logs\log_file_2026-03-15_20-41-31.log'.
+2026-03-15 20:41:36.918 | INFO     | ao_compensation_model.app:_run_train:41 - Starting GRU training pipeline...
+2026-03-15 20:41:38.697 | INFO     | ao_compensation_model.training:train:145 - Initializing Random Forest Regressor...
+2026-03-15 20:41:38.698 | INFO     | ao_compensation_model.training:train:155 - Training started on 36529 samples with 200 flattened features.
+2026-03-15 20:43:38.447 | INFO     | ao_compensation_model.training:train:157 - Training completed.
+2026-03-15 20:43:38.448 | INFO     | ao_compensation_model.training:train:160 - Evaluating on validation set...
+2026-03-15 20:43:38.522 | INFO     | ao_compensation_model.training:train:168 - Validation Total MSE: 0.085083
+2026-03-15 20:43:38.523 | INFO     | ao_compensation_model.training:train:169 - Validation Phase MSE: 0.111604
+2026-03-15 20:43:38.523 | INFO     | ao_compensation_model.training:train:170 - Validation Omega MSE: 0.032042
+2026-03-15 20:43:38.616 | INFO     | ao_compensation_model.training:train:178 - Random Forest model saved as: D:\01_Code\ao_compensation_model\src\ao_compensation_model\model\2026_03_15_20_41_RF_loss_0.0851\rf_model.joblib
+2026-03-15 20:43:38.664 | SUCCESS  | ao_compensation_model.app:_run_train:43 - Training complete.

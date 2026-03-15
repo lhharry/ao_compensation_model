@@ -1,0 +1,15 @@
+2026-03-15 20:50:04.117 | INFO     | ao_compensation_model.utils:setup_logger:387 - Logging to 'data\logs\log_file_2026-03-15_20-50-04.log'.
+2026-03-15 20:50:05.719 | INFO     | ao_compensation_model.app:_run_validate:59 - Running validation on test data...
+2026-03-15 20:50:05.720 | INFO     | ao_compensation_model.app:_run_validate:61 -   Validating: test_20260304_14_26_34_4km_stopgo_target.csv
+2026-03-15 20:50:05.722 | INFO     | ao_compensation_model.validation:load_latest_rf_model:36 - Loading model from: 2026_03_15_20_41_RF_loss_0.0851
+2026-03-15 20:50:06.136 | INFO     | ao_compensation_model.validation:validate:88 - Validating on file: D:\01_Code\ao_compensation_model\src\ao_compensation_model\dataset\test\test_20260304_14_26_34_4km_stopgo_target.csv
+2026-03-15 20:50:06.184 | INFO     | ao_compensation_model.validation:validate:117 - Running inference...
+2026-03-15 20:50:06.248 | INFO     | ao_compensation_model.validation:validate:149 - Phase Angle RMSE: 1.1254 rad, MAE: 0.9377 rad
+2026-03-15 20:50:06.249 | INFO     | ao_compensation_model.validation:validate:150 - Omega RMSE:       2.6376 rad/s, MAE: 2.3305 rad/s
+2026-03-15 20:50:33.076 | INFO     | ao_compensation_model.app:_run_validate:61 -   Validating: test_20260304_14_29_24_5km_stopgo_target.csv
+2026-03-15 20:50:33.079 | INFO     | ao_compensation_model.validation:load_latest_rf_model:36 - Loading model from: 2026_03_15_20_41_RF_loss_0.0851
+2026-03-15 20:50:33.257 | INFO     | ao_compensation_model.validation:validate:88 - Validating on file: D:\01_Code\ao_compensation_model\src\ao_compensation_model\dataset\test\test_20260304_14_29_24_5km_stopgo_target.csv
+2026-03-15 20:50:33.296 | INFO     | ao_compensation_model.validation:validate:117 - Running inference...
+2026-03-15 20:50:33.367 | INFO     | ao_compensation_model.validation:validate:149 - Phase Angle RMSE: 0.9027 rad, MAE: 0.7136 rad
+2026-03-15 20:50:33.368 | INFO     | ao_compensation_model.validation:validate:150 - Omega RMSE:       2.7229 rad/s, MAE: 2.3042 rad/s
+2026-03-15 20:50:36.108 | SUCCESS  | ao_compensation_model.app:_run_validate:63 - Validation complete.

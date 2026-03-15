@@ -1,0 +1,13 @@
+2026-03-15 21:00:15.521 | INFO     | ao_compensation_model.utils:setup_logger:387 - Logging to 'data\logs\log_file_2026-03-15_21-00-15.log'.
+2026-03-15 21:00:17.080 | INFO     | ao_compensation_model.app:_run_validate:59 - Running validation on test data...
+2026-03-15 21:00:17.081 | INFO     | ao_compensation_model.app:_run_validate:61 -   Validating: test_20260304_14_26_34_4km_stopgo_target.csv
+2026-03-15 21:00:17.083 | INFO     | ao_compensation_model.validation:load_latest_rf_model:63 - Loading model from: 2026_03_15_20_58_RF_loss_0.0859
+2026-03-15 21:00:17.453 | INFO     | ao_compensation_model.validation:validate:88 - Validating on: test_20260304_14_26_34_4km_stopgo_target.csv
+2026-03-15 21:00:17.481 | INFO     | ao_compensation_model.validation:validate:102 - Extracting handcrafted features for inference...
+2026-03-15 21:00:17.613 | INFO     | ao_compensation_model.validation:validate:127 - Phase MAE: 1.0834 rad
+2026-03-15 21:00:26.333 | INFO     | ao_compensation_model.app:_run_validate:61 -   Validating: test_20260304_14_29_24_5km_stopgo_target.csv
+2026-03-15 21:00:26.335 | INFO     | ao_compensation_model.validation:load_latest_rf_model:63 - Loading model from: 2026_03_15_20_58_RF_loss_0.0859
+2026-03-15 21:00:26.495 | INFO     | ao_compensation_model.validation:validate:88 - Validating on: test_20260304_14_29_24_5km_stopgo_target.csv
+2026-03-15 21:00:26.513 | INFO     | ao_compensation_model.validation:validate:102 - Extracting handcrafted features for inference...
+2026-03-15 21:00:26.620 | INFO     | ao_compensation_model.validation:validate:127 - Phase MAE: 0.8592 rad
+2026-03-15 21:00:28.858 | SUCCESS  | ao_compensation_model.app:_run_validate:63 - Validation complete.

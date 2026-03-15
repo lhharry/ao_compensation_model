@@ -1,0 +1,4 @@
+2026-03-15 18:02:47.003 | INFO     | ao_compensation_model.utils:setup_logger:387 - Logging to 'data\logs\log_file_2026-03-15_18-02-46.log'.
+2026-03-15 18:02:48.386 | INFO     | ao_compensation_model.app:_run_validate:59 - Running validation on test data...
+2026-03-15 18:02:48.387 | INFO     | ao_compensation_model.app:_run_validate:61 -   Validating: test_20260304_14_26_34_4km_stopgo_target.csv
+2026-03-15 18:03:05.769 | INFO     | ao_compensation_model.app:_run_validate:61 -   Validating: test_20260304_14_29_24_5km_stopgo_target.csv
