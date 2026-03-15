@@ -21,7 +21,6 @@ from ao_compensation_model.definitions import (
     TARGET_LEAD,
 )
 from ao_compensation_model.utils import create_sliding_windows
-
 # ---------------------------------------------------------------------------
 # Data container
 # ---------------------------------------------------------------------------
@@ -306,7 +305,7 @@ def validate(csv_name: str) -> ValidationResult:
     :return: A :class:`ValidationResult` with all computed arrays.
     """
     data = load_test_data(TEST_DATA_DIR / csv_name)
-    folder_name = "2026_03_15_19_58_0.4038"
+    folder_name = "2026_03_15_22_05_0.4078"
     x, _, target_sin, target_cos, target_omega = prepare_features_and_targets(
         data, MODEL_DIR / folder_name / "scaler.pkl"
     )

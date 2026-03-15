@@ -81,7 +81,6 @@ def build_gru_model(
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
     x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(inp)
-    x = LayerNormalization(name="gru_norm")(x)
     phase_out = Dense(units=2, activation="linear",kernel_regularizer=l2(0.001))(x)
     phase_normalized = UnitNormalization(axis=-1, name="phase")(phase_out)
     omega_out = Dense(units=1, activation="linear", name="omega",kernel_regularizer=l2(0.001))(x)
@@ -196,7 +195,7 @@ def train():
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE,clipnorm=1.0),
-        loss={"phase": "mse", "omega": Huber(delta=1.0)},
+        loss={"phase": "mse", "omega": Huber(delta=0.5)},
         loss_weights={"phase": 3.0, "omega": 1.0},
     )
 
@@ -228,8 +227,8 @@ def train():
         ),
         EpochLogger(),
     ]
-    last_sin = y_train[:, -1, 0]
-    sample_weights = np.where(last_sin == 0, 0.1, 1.0)
+    last_omega = y_train[:, -1, 0]
+    sample_weights = np.where(last_omega == 0, 0.3, 1.0)
 
     history = model.fit(
         x_train,

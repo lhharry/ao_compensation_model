@@ -169,6 +169,4 @@ cython_debug/
 .pixi
 *.egg-info
 
-/logs/log_*
-
 src/ao_compensation_model/dataset/raw
