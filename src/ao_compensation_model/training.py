@@ -11,20 +11,21 @@ from datetime import date
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 from pathlib import Path
+import random
 
 import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from loguru import logger
-from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
-from tensorflow.keras.losses import Huber, CosineSimilarity
+from sklearn.preprocessing import RobustScaler
+from tensorflow.keras.losses import Huber
 from tensorflow.keras.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, Dense, Input, LayerNormalization, UnitNormalization
+from tensorflow.keras.layers import GRU, LSTM, Dense, Input, UnitNormalization
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
@@ -43,6 +44,30 @@ from ao_compensation_model.definitions import (
 )
 from ao_compensation_model.utils import create_sliding_windows, setup_logger
 
+def set_seed(seed: int = 42):
+    """Set global random seeds for exact reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+
+    os.environ['TF_DETERMINISTIC_OPS'] = '1'
+    os.environ['PYTHONHASHSEED'] = str(seed)
+
+def setup_gpu():
+    """Configure TensorFlow to use the GPU with dynamic memory allocation."""
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        try:
+            # Enable memory growth so TF doesn't hoard all VRAM at startup
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            logger.info(f"Successfully configured GPU. {len(gpus)} Physical GPUs, {len(logical_gpus)} Logical GPUs available.")
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            logger.error(f"RuntimeError during GPU configuration: {e}")
+    else:
+        logger.warning("No compatible GPU found. TensorFlow will fall back to CPU for training.")
 
 def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     """Load a single labelled CSV and return features and targets.
@@ -60,12 +85,8 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     target_cos = np.asarray(df["target_cos"].values).copy()
 
     targets = np.column_stack([target_sin, target_cos, omega])
-    features = np.column_stack(
-        [raw_angle, angular_velocity]
-    )
-
+    features = np.column_stack([raw_angle, angular_velocity])
     return features, targets
-
 
 def build_gru_model(
     window_size: int,
@@ -117,6 +138,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
 
 def train():
     """Run the full training pipeline: load data, train, and export TFLite."""
+    setup_gpu()
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     today_str = date.today().strftime("%Y_%m_%d")
     time_str = pd.Timestamp.now().strftime("%H_%M")
@@ -134,7 +156,6 @@ def train():
         file_data.append((csv_file.name, features, targets))
 
     # --- File-level train/val split to prevent data leakage ---
-    rng = np.random.default_rng(42)
     val_subjects = {"L"}
 
     # --- Fit scaler on training files  ---
@@ -178,7 +199,7 @@ def train():
     y_val = np.concatenate(y_val_list)
 
     # Shuffle training data
-    idx = rng.permutation(len(x_train))
+    idx = np.random.permutation(len(x_train))
     x_train, y_train = x_train[idx], y_train[idx]
 
     y_train_phase = y_train[:, -1, :2]         # (N, 2)
@@ -195,7 +216,7 @@ def train():
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE,clipnorm=1.0),
-        loss={"phase": "mse", "omega": Huber(delta=0.5)},
+        loss={"phase": "mse", "omega": "mse"},
         loss_weights={"phase": 3.0, "omega": 1.0},
     )
 
@@ -217,7 +238,7 @@ def train():
             monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6, verbose=1
         ),
         EarlyStopping(
-            monitor="val_loss", patience=5, restore_best_weights=True, verbose=1
+            monitor="val_loss", patience=8, restore_best_weights=True, verbose=1
         ),
         ModelCheckpoint(
             filepath=str(model_path),
@@ -227,8 +248,8 @@ def train():
         ),
         EpochLogger(),
     ]
-    last_omega = y_train[:, -1, 0]
-    sample_weights = np.where(last_omega == 0, 0.3, 1.0)
+    last_sin = y_train[:, -1, 0]
+    sample_weights = np.where(last_sin == 0, 0.3, 1.0)
 
     history = model.fit(
         x_train,

@@ -35,9 +35,9 @@ STATIONARY_THRESHOLD_RATIO: float = 0.3
 # --- GRU Model ---
 WINDOW_SIZE: int = 200
 STRIDE: int = 20
-GRU_UNITS: int = 128
+GRU_UNITS: int = 32
 DROPOUT_RATE: float = 0.3
-BATCH_SIZE: int = 128
+BATCH_SIZE: int = 32
 MAX_EPOCHS: int = 100
 LEARNING_RATE: float = 0.001
 VAL_SPLIT: float = 0.2
