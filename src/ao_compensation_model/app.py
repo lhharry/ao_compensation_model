@@ -46,7 +46,7 @@ def _run_train(file: str | None, threshold: float | None) -> None:
 def _run_validate(file: str | None, threshold: float | None) -> None:
     """Validate model on test data."""
     from ao_compensation_model.definitions import TEST_DATA_DIR
-    from ao_compensation_model.validation import validate
+    from ao_compensation_model.validation import validate_prediction
 
     if file is not None:
         csv_path = Path(file)
@@ -59,7 +59,7 @@ def _run_validate(file: str | None, threshold: float | None) -> None:
     logger.info("Running validation on test data...")
     for name in csv_files:
         logger.info(f"  Validating: {name}")
-        validate(name)
+        validate_prediction(name)
     logger.success("Validation complete.")
 
 

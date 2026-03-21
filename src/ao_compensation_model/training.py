@@ -19,13 +19,12 @@ import pandas as pd
 import tensorflow as tf
 from loguru import logger
 from sklearn.preprocessing import RobustScaler
-from tensorflow.keras.losses import Huber
 from tensorflow.keras.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, LSTM, Dense, Input, UnitNormalization,Conv1D
+from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization, Conv1D
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
@@ -73,18 +72,17 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     """Load a single labelled CSV and return features and targets.
 
     :param csv_path: Path to a training CSV with target_cos / target_sin columns.
-    :return: (features, targets) arrays. Targets have columns [sin, cos, omega].
+    :return: (features, targets) arrays. Targets have columns [sin, cos].
     """
     df = pd.read_csv(csv_path, sep=";")
 
     raw_angle = np.asarray(df["Hip_x"].values)
     angular_velocity = np.asarray(df["Hip_vel"].values)
 
-    omega = np.asarray(df["target_omega"].values)
     target_sin = np.asarray(df["target_sin"].values).copy()
     target_cos = np.asarray(df["target_cos"].values).copy()
 
-    targets = np.column_stack([target_sin, target_cos, omega])
+    targets = np.column_stack([target_sin, target_cos])
     features = np.column_stack([raw_angle, angular_velocity])
     return features, targets
 
@@ -101,15 +99,14 @@ def build_gru_model(
     :return: Keras Model (uncompiled).
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
-    x = Conv1D(filters=16, kernel_size=5, padding="same", activation="linear")(inp)
-    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(inp)
-    phase_out = Dense(units=2, activation="linear",kernel_regularizer=l2(0.001))(x)
+    x_filter = Conv1D(filters=8, kernel_size=21, padding="same", activation="linear")(inp)
+    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(x_filter)
+    phase_out = Dense(units=2, activation="linear", kernel_regularizer=l2(0.001))(x)
     phase_normalized = UnitNormalization(axis=-1, name="phase")(phase_out)
-    omega_out = Dense(units=1, activation="linear", name="omega",kernel_regularizer=l2(0.001))(x)
-    return Model(inputs=inp, outputs={"phase": phase_normalized, "omega": omega_out})
+    return Model(inputs=inp, outputs=phase_normalized)
 
 class EpochLogger(tf.keras.callbacks.Callback):
-    """Log phase and omega validation losses after every epoch."""
+    """Log validation loss after every epoch."""
 
     def on_train_begin(self, logs=None):
         logger.info("Training started.")
@@ -130,11 +127,9 @@ class EpochLogger(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
         logger.info(
-            "Epoch {:3d} | val_loss: {:.6f}  val_phase_loss: {:.6f}  val_omega_loss: {:.6f}",
+            "Epoch {:3d} | val_loss: {:.6f}",
             epoch + 1,
             logs.get("val_loss", float("nan")),
-            logs.get("val_phase_loss", float("nan")),
-            logs.get("val_omega_loss", float("nan")),
         )
 
 def train():
@@ -204,21 +199,12 @@ def train():
     x_train, y_train = x_train[idx], y_train[idx]
 
     y_train_phase = y_train[:, -1, :2]         # (N, 2)
-    y_train_omega_raw = y_train[:, -1, 2:3]    # (N, 1)
     y_val_phase = y_val[:, -1, :2]
-    y_val_omega_raw = y_val[:, -1, 2:3]
-
-    # Normalize omega targets so loss scale matches phase (~[-1,1])
-    omega_scaler = RobustScaler()
-    y_train_omega = omega_scaler.fit_transform(y_train_omega_raw)  # (N, 1)
-    y_val_omega = omega_scaler.transform(y_val_omega_raw)
-    joblib.dump(omega_scaler, MODEL_DIR / "omega_scaler.pkl")
 
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
     model.compile(
-        optimizer=Adam(learning_rate=LEARNING_RATE,clipnorm=1.0),
-        loss={"phase": "mse", "omega": "mse"},
-        loss_weights={"phase": 3.0, "omega": 0.0},
+        optimizer=Adam(learning_rate=LEARNING_RATE, clipnorm=1.0),
+        loss="mse",
     )
 
     # --- Log model structure and parameter counts ---
@@ -254,14 +240,11 @@ def train():
 
     history = model.fit(
         x_train,
-        {"phase": y_train_phase, "omega": y_train_omega},
+        y_train_phase,
         epochs=MAX_EPOCHS,
         batch_size=BATCH_SIZE,
         sample_weight=sample_weights,
-        validation_data=(
-            x_val,
-            {"phase": y_val_phase, "omega": y_val_omega},
-        ),
+        validation_data=(x_val, y_val_phase),
         callbacks=callbacks,
     )
 
@@ -293,7 +276,6 @@ def train():
         f.write(tflite_model)
     logger.info("TFLite model saved as: {}", tflite_path.name)
     joblib.dump(scaler, str(best_model_path / "scaler.pkl"))
-    joblib.dump(omega_scaler, str(best_model_path / "omega_scaler.pkl"))
 
 if __name__ == "__main__":
     setup_logger()
