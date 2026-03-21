@@ -25,7 +25,7 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, LSTM, Dense, Input, UnitNormalization
+from tensorflow.keras.layers import GRU, LSTM, Dense, Input, UnitNormalization,Conv1D
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
@@ -77,8 +77,8 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     """
     df = pd.read_csv(csv_path, sep=";")
 
-    raw_angle = np.asarray(df["filter_hip_x"].values)
-    angular_velocity = np.asarray(df["filter_hip_vel"].values)
+    raw_angle = np.asarray(df["Hip_x"].values)
+    angular_velocity = np.asarray(df["Hip_vel"].values)
 
     omega = np.asarray(df["target_omega"].values)
     target_sin = np.asarray(df["target_sin"].values).copy()
@@ -101,6 +101,7 @@ def build_gru_model(
     :return: Keras Model (uncompiled).
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
+    x = Conv1D(filters=16, kernel_size=5, padding="same", activation="linear")(inp)
     x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(inp)
     phase_out = Dense(units=2, activation="linear",kernel_regularizer=l2(0.001))(x)
     phase_normalized = UnitNormalization(axis=-1, name="phase")(phase_out)
@@ -156,7 +157,7 @@ def train():
         file_data.append((csv_file.name, features, targets))
 
     # --- File-level train/val split to prevent data leakage ---
-    val_subjects = {"L"}
+    val_subjects = {"Y", "D", "L"} 
 
     # --- Fit scaler on training files  ---
     train_features_for_fit = np.vstack(
@@ -217,7 +218,7 @@ def train():
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE,clipnorm=1.0),
         loss={"phase": "mse", "omega": "mse"},
-        loss_weights={"phase": 3.0, "omega": 1.0},
+        loss_weights={"phase": 3.0, "omega": 0.0},
     )
 
     # --- Log model structure and parameter counts ---

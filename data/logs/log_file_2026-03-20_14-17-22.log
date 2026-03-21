@@ -1,0 +1,57 @@
+2026-03-20 14:17:22.240 | INFO     | ao_compensation_model.utils:setup_logger:387 - Logging to 'data\logs\log_file_2026-03-20_14-17-22.log'.
+2026-03-20 14:17:26.537 | INFO     | ao_compensation_model.app:_run_train:41 - Starting GRU training pipeline...
+2026-03-20 14:17:26.538 | WARNING  | ao_compensation_model.training:setup_gpu:70 - No compatible GPU found. TensorFlow will fall back to CPU for training.
+2026-03-20 14:17:27.114 | INFO     | ao_compensation_model.training:train:226 - Model architecture:
+Model: "functional"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Layer (type)                  ┃ Output Shape              ┃         Param # ┃ Connected to               ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ input_layer (InputLayer)      │ (None, 200, 2)            │               0 │ -                          │
+├───────────────────────────────┼───────────────────────────┼─────────────────┼────────────────────────────┤
+│ gru (GRU)                     │ (None, 64)                │          13,056 │ input_layer[0][0]          │
+├───────────────────────────────┼───────────────────────────┼─────────────────┼────────────────────────────┤
+│ dense (Dense)                 │ (None, 2)                 │             130 │ gru[0][0]                  │
+├───────────────────────────────┼───────────────────────────┼─────────────────┼────────────────────────────┤
+│ omega (Dense)                 │ (None, 1)                 │              65 │ gru[0][0]                  │
+├───────────────────────────────┼───────────────────────────┼─────────────────┼────────────────────────────┤
+│ phase (UnitNormalization)     │ (None, 2)                 │               0 │ dense[0][0]                │
+└───────────────────────────────┴───────────────────────────┴─────────────────┴────────────────────────────┘
+ Total params: 13,251 (51.76 KB)
+ Trainable params: 13,251 (51.76 KB)
+ Non-trainable params: 0 (0.00 B)
+
+
+2026-03-20 14:17:27.119 | INFO     | ao_compensation_model.training:train:229 - Parameters — trainable: 13251  non-trainable: 0  total: 13251
+2026-03-20 14:17:27.166 | INFO     | ao_compensation_model.training:on_train_begin:114 - Training started.
+2026-03-20 14:17:27.166 | INFO     | ao_compensation_model.training:on_train_begin:115 - Hyperparameters:
+  WINDOW_SIZE: 200
+  STRIDE: 20
+  TARGET_LEAD: 0
+  GRU_UNITS: 64
+  DROPOUT_RATE: 0.3
+  BATCH_SIZE: 128
+  MAX_EPOCHS: 100
+  LEARNING_RATE: 0.001
+  TRAINING_DATA_DIR: D:\01_Code\ao_compensation_model\src\ao_compensation_model\dataset\training
+  MODEL_DIR: D:\01_Code\ao_compensation_model\src\ao_compensation_model\model
+2026-03-20 14:17:36.871 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   1 | val_loss: 0.301265  val_phase_loss: 0.098072  val_omega_loss: 3.382437
+2026-03-20 14:17:45.441 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   2 | val_loss: 0.282941  val_phase_loss: 0.092667  val_omega_loss: 3.386173
+2026-03-20 14:17:53.676 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   3 | val_loss: 0.300892  val_phase_loss: 0.099051  val_omega_loss: 3.386036
+2026-03-20 14:18:01.220 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   4 | val_loss: 0.274047  val_phase_loss: 0.089016  val_omega_loss: 3.383722
+2026-03-20 14:18:11.745 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   5 | val_loss: 0.224021  val_phase_loss: 0.073471  val_omega_loss: 3.384046
+2026-03-20 14:18:19.548 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   6 | val_loss: 0.209678  val_phase_loss: 0.068423  val_omega_loss: 3.386872
+2026-03-20 14:18:27.168 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   7 | val_loss: 0.246538  val_phase_loss: 0.080633  val_omega_loss: 3.387607
+2026-03-20 14:18:37.532 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   8 | val_loss: 0.227276  val_phase_loss: 0.074049  val_omega_loss: 3.389671
+2026-03-20 14:18:45.693 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch   9 | val_loss: 0.192967  val_phase_loss: 0.062711  val_omega_loss: 3.390723
+2026-03-20 14:18:53.464 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  10 | val_loss: 0.189450  val_phase_loss: 0.062021  val_omega_loss: 3.391140
+2026-03-20 14:19:03.797 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  11 | val_loss: 0.231738  val_phase_loss: 0.075455  val_omega_loss: 3.391449
+2026-03-20 14:19:11.796 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  12 | val_loss: 0.242561  val_phase_loss: 0.080426  val_omega_loss: 3.391611
+2026-03-20 14:19:19.764 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  13 | val_loss: 0.200966  val_phase_loss: 0.065468  val_omega_loss: 3.391685
+2026-03-20 14:19:27.203 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  14 | val_loss: 0.207095  val_phase_loss: 0.067798  val_omega_loss: 3.391693
+2026-03-20 14:19:35.134 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  15 | val_loss: 0.338621  val_phase_loss: 0.110327  val_omega_loss: 3.391706
+2026-03-20 14:19:43.095 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  16 | val_loss: 0.326344  val_phase_loss: 0.106454  val_omega_loss: 3.391712
+2026-03-20 14:19:51.175 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  17 | val_loss: 0.408283  val_phase_loss: 0.133147  val_omega_loss: 3.391715
+2026-03-20 14:19:58.977 | INFO     | ao_compensation_model.training:on_epoch_end:131 - Epoch  18 | val_loss: 0.520363  val_phase_loss: 0.169373  val_omega_loss: 3.391716
+2026-03-20 14:19:58.991 | INFO     | ao_compensation_model.training:train:276 - Best model saved as: gru_model.keras (val_loss=0.189450)
+2026-03-20 14:19:59.731 | INFO     | ao_compensation_model.training:train:293 - TFLite model saved as: gru_model_edge.tflite
+2026-03-20 14:19:59.739 | SUCCESS  | ao_compensation_model.app:_run_train:43 - Training complete.

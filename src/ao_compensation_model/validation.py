@@ -256,7 +256,7 @@ def plot_results(result: ValidationResult) -> None:
 
     # Panel 4 — Phase comparison
     axs[4].set_title(
-        r"4. Final Phase Comparison [$-\pi, \pi$]: Original AO vs Enhanced (AO + GRU)",
+        r"4. Final Phase Comparison [$-\pi, \pi$]: Original AO vs Enhanced (GRU)",
         fontsize=14,
         fontweight="bold",
     )
@@ -306,7 +306,7 @@ def validate(csv_name: str) -> ValidationResult:
     :return: A :class:`ValidationResult` with all computed arrays.
     """
     data = load_test_data(TEST_DATA_DIR / csv_name)
-    folder_name = "2026_03_17_10_44_0.3970"
+    folder_name = "2026_03_20_14_31_0.2584"
     x, _, target_sin, target_cos, target_omega = prepare_features_and_targets(
         data, MODEL_DIR / folder_name / "scaler.pkl"
     )
