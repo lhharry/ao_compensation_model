@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from ao_compensation_model.definitions import WINDOW_SIZE
-from ao_compensation_model.training import (
+from ao_compensation_model.training_search import (
     build_gru_model,
     preprocess_one_csv,
 )

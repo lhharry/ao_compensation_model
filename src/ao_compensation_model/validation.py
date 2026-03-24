@@ -17,7 +17,7 @@ from ao_compensation_model.definitions import (
 fs = 100 # Sampling frequency (Hz)
 dt = 1 / fs
 script_dir = Path(__file__).resolve().parent
-path = 'model\\2026_03_21_12_46_0.0680'
+path = 'model\\2026_03_24_18_43_0.1026'
 model_path= os.path.join(script_dir, path, 'gru_model_edge.tflite')
 scaler_path = os.path.join(script_dir, path,'scaler.pkl')
 
@@ -43,10 +43,8 @@ def load_test_data(csv_path: Path) -> dict[str, np.ndarray]:
     """
     df = pd.read_csv(csv_path, sep=";")
     return {
-        "raw_angle": np.asarray(df["raw_angle"].values),
-        "filtered_angle": np.asarray(df["filtered_angle"].values),
-        "angular_velocity": np.asarray(df["raw_velocity"].values),
-        "filtered_angular_velocity": np.asarray(df["filtered_velocity"].values),
+        "raw_angle": np.asarray(df["Hip_x"].values),
+        "angular_velocity": np.asarray(df["Hip_vel"].values),
     }
 
 def data_preparation(raw_hip_angle_left, input_velocity):
@@ -115,21 +113,14 @@ def plot_prediction(data: dict[str, np.ndarray], predicted_phase: np.ndarray) ->
     _, axs = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
 
     axs[0].set_title("1. Hip Angle", fontsize=14, fontweight="bold")
-    axs[0].plot(t, data["raw_angle"], label="Raw Hip Angle", color="gray", alpha=0.8)
-    axs[0].plot(t, data["filtered_angle"], label="Filtered Hip Angle", color="blue", alpha=0.8)
+    axs[0].plot(t, data["raw_angle"], label="Raw Hip Angle", color="blue", alpha=0.8)
     axs[0].set_ylabel("Angle")
     axs[0].legend(loc="upper right")
     axs[0].grid(True, alpha=0.3)
 
     axs[1].set_title("2. Hip Velocity", fontsize=14, fontweight="bold")
-    axs[1].plot(t, data["angular_velocity"], label="Raw Hip Velocity", color="gray", alpha=0.8)
-    axs[1].plot(
-        t,
-        data["filtered_angular_velocity"],
-        label="Filtered Hip Velocity",
-        color="blue",
-        alpha=0.8,
-    )
+    axs[1].plot(t, data["angular_velocity"], label="Raw Hip Velocity", color="blue", alpha=0.8)
+
     axs[1].set_ylabel("Velocity")
     axs[1].legend(loc="upper right")
     axs[1].grid(True, alpha=0.3)

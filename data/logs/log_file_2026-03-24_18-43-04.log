@@ -1,0 +1,50 @@
+2026-03-24 18:43:04.838 | INFO     | ao_compensation_model.utils:setup_logger:387 - Logging to 'data\logs\log_file_2026-03-24_18-43-04.log'.
+2026-03-24 18:43:11.710 | INFO     | ao_compensation_model.app:_run_train:41 - Starting GRU training pipeline...
+2026-03-24 18:43:11.714 | WARNING  | ao_compensation_model.training:setup_gpu:72 - No compatible GPU found. TensorFlow will fall back to CPU for training.
+2026-03-24 18:43:13.064 | INFO     | ao_compensation_model.training:train:222 - Model architecture:
+Model: "functional"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ Layer (type)                         ┃ Output Shape                ┃         Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ input_layer (InputLayer)             │ (128, 200, 2)               │               0 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ conv1d (Conv1D)                      │ (128, 200, 8)               │             328 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ batch_normalization                  │ (128, 200, 8)               │              32 │
+│ (BatchNormalization)                 │                             │                 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ zero_padding1d (ZeroPadding1D)       │ (128, 202, 8)               │               0 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ average_pooling1d (AveragePooling1D) │ (128, 200, 8)               │               0 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ gru (GRU)                            │ (128, 8)                    │             432 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ dense (Dense)                        │ (128, 2)                    │              18 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ phase (UnitNormalization)            │ (128, 2)                    │               0 │
+└──────────────────────────────────────┴─────────────────────────────┴─────────────────┘
+ Total params: 810 (3.16 KB)
+ Trainable params: 794 (3.10 KB)
+ Non-trainable params: 16 (64.00 B)
+
+
+2026-03-24 18:43:13.079 | INFO     | ao_compensation_model.training:train:225 - Parameters — trainable: 794  non-trainable: 16  total: 810
+2026-03-24 18:43:13.189 | INFO     | ao_compensation_model.training:on_train_begin:117 - Training started.
+2026-03-24 18:43:13.190 | INFO     | ao_compensation_model.training:on_train_begin:118 - Hyperparameters:
+  WINDOW_SIZE: 200
+  STRIDE: 20
+  TARGET_LEAD: 0
+  GRU_UNITS: 8
+  DROPOUT_RATE: 0.2
+  FILTERS: 8
+  KERNEL_SIZE: 20
+  POOL_SIZE: 3
+  BATCH_SIZE: 128
+  MAX_EPOCHS: 1
+  LEARNING_RATE: 0.0005
+  TRAINING_DATA_DIR: D:\01_Code\ao_compensation_model\src\ao_compensation_model\dataset\training
+  MODEL_DIR: D:\01_Code\ao_compensation_model\src\ao_compensation_model\model
+2026-03-24 18:43:21.576 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   1 | val_loss: 0.190221
+2026-03-24 18:43:21.604 | INFO     | ao_compensation_model.training:train:257 - Best model saved as: gru_model.keras (val_loss=0.190221)
+2026-03-24 18:43:24.770 | INFO     | ao_compensation_model.training:train:274 - TFLite model saved as: gru_model_edge.tflite
+2026-03-24 18:43:24.778 | SUCCESS  | ao_compensation_model.app:_run_train:43 - Training complete.
