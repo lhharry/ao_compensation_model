@@ -34,13 +34,13 @@ def prepare_targets(
     df = pd.read_csv(input_path, sep=";")
 
     raw_hip_angle = np.asarray(df["Hip_x"].values)
-    ao_phase = np.asarray(df["Hip_AO"].values)
+    ao_phase = np.asarray(df["GP_AO"].values)
 
     # Bandpass filter to remove noise and DC offset
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
 
     # Align AO phase so that its peak corresponds to Hip_x peak
-    aligned_phase, _, _ = align_ao_phase(
+    aligned_phase, phase_amplitude, phase_threshold = align_ao_phase(
         filtered_hip, ao_phase, threshold=threshold
     )
     tp_cos = np.cos(aligned_phase)
@@ -50,12 +50,14 @@ def prepare_targets(
     gru_targets = generate_gru_targets(tp_cos, tp_sin)
 
     # Align AO omega with offline ground-truth (per-cycle quality check)
-    ao_omega = np.asarray(df["Hip_omega"].values)
+    # Reuse phase's amplitude envelope and threshold so omega=0 matches phase=0
+    ao_omega = np.asarray(df["Omega"].values)
     time_seconds = (pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
                     - pd.to_datetime(df["Time"].iloc[0], format="%H:%M:%S.%f"))
     time_array = time_seconds.dt.total_seconds().values
     aligned_omega, _, _ = align_omega(
-        filtered_hip, ao_omega, time_array, fs=fs, threshold=threshold,
+        filtered_hip, ao_omega, time_array, fs=fs,
+        threshold=phase_threshold, amplitude_envelope=phase_amplitude,
     )
 
     df["target_cos"] = gru_targets[:, 0]
@@ -75,7 +77,7 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=None):
 
     t = pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
     raw_hip_angle = np.asarray(df["Hip_x"].values)
-    ao_raw_phase = np.asarray(df["Hip_AO"].values)
+    ao_raw_phase = np.asarray(df["GP_AO"].values)
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
     aligned_phase, amplitude, used_threshold = align_ao_phase(
         filtered_hip, ao_raw_phase, threshold=threshold
@@ -131,7 +133,7 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=None):
 
     axs[4].set_title("Step 5: Omega Target (Aligned Omega)")
     axs[4].plot(t, df["target_omega"], label="Target Omega", color="brown")
-    axs[4].plot(t, df["Hip_omega"], label="Raw AO Omega", color="red", alpha=0.5)
+    axs[4].plot(t, df["Omega"], label="Raw AO Omega", color="red", alpha=0.5)
     axs[4].grid(True, alpha=0.3)
     axs[4].set_ylabel("Angular Velocity (Rad/s)")
     axs[4].set_xlabel("Time")

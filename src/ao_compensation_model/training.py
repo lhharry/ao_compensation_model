@@ -218,7 +218,7 @@ def train():
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE,clipnorm=1.0),
         loss={"phase": "mse", "omega": "mse"},
-        loss_weights={"phase": 3.0, "omega": 0.0},
+        loss_weights={"phase": 3.0, "omega": 1.0},
     )
 
     # --- Log model structure and parameter counts ---

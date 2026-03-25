@@ -225,6 +225,7 @@ def align_omega(
     fs: int = SAMPLING_FREQ,
     omega_error_threshold: float = 1.0,
     threshold: float | None = None,
+    amplitude_envelope: np.ndarray | None = None,
     window_time: float = 1,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Align AO omega to the offline ground-truth with per-cycle quality check.
@@ -244,6 +245,9 @@ def align_omega(
         falling back to the offline omega.
     :param threshold: Amplitude threshold for stationary detection.
         *None* = auto-compute.
+    :param amplitude_envelope: Pre-computed amplitude envelope (e.g. from
+        align_ao_phase) so omega zeros match phase zeros.  *None* = compute
+        internally.
     :param window_time: Window length (seconds) for the RMS envelope.
     :return: (aligned_omega, amplitude_envelope, used_threshold).
     """
@@ -266,13 +270,14 @@ def align_omega(
             aligned_omega[start:end] = ao_omega[start:end]
         # else: offline_omega already in place
 
-    # RMS amplitude envelope (same as align_ao_phase)
-    window_size = max(1, int(window_time / dt))
-    squared_signal = filtered_signal ** 2
-    mean_squared = np.convolve(
-        squared_signal, np.ones(window_size) / window_size, mode="same"
-    )
-    amplitude_envelope = np.sqrt(mean_squared)
+    # Reuse external amplitude envelope if provided, otherwise compute locally
+    if amplitude_envelope is None:
+        window_size = max(1, int(window_time / dt))
+        squared_signal = filtered_signal ** 2
+        mean_squared = np.convolve(
+            squared_signal, np.ones(window_size) / window_size, mode="same"
+        )
+        amplitude_envelope = np.sqrt(mean_squared)
 
     if threshold is None:
         if len(peaks) > 0:
@@ -284,6 +289,24 @@ def align_omega(
 
     # Zero out stationary segments
     aligned_omega[amplitude_envelope < threshold] = 0.0
+
+    # Smooth ramp-up / ramp-down at zero↔non-zero transitions
+    ramp_duration = 0.5  # seconds
+    ramp_samples = max(1, int(ramp_duration * fs))
+    is_active = aligned_omega > 0
+    for i in range(1, len(is_active)):
+        # Rising edge: transition from 0 → non-zero
+        if is_active[i] and not is_active[i - 1]:
+            ramp_end = min(i + ramp_samples, len(aligned_omega))
+            n = ramp_end - i
+            ramp = np.linspace(0.0, 1.0, n)
+            aligned_omega[i:ramp_end] *= ramp
+        # Falling edge: transition from non-zero → 0
+        elif not is_active[i] and is_active[i - 1]:
+            ramp_start = max(i - ramp_samples, 0)
+            n = i - ramp_start
+            ramp = np.linspace(1.0, 0.0, n)
+            aligned_omega[ramp_start:i] *= ramp
 
     return aligned_omega, amplitude_envelope, threshold
 
