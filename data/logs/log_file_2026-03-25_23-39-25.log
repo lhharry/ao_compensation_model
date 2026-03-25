@@ -1,0 +1,5 @@
+2026-03-25 23:39:25.797 | INFO     | ao_compensation_model.utils:setup_logger:421 - Logging to 'data\logs\log_file_2026-03-25_23-39-25.log'.
+2026-03-25 23:39:28.657 | INFO     | ao_compensation_model.app:_run_prep:16 - Stationary threshold: auto
+2026-03-25 23:39:28.658 | INFO     | ao_compensation_model.app:_run_prep:28 - Preparing ground-truth targets from raw data...
+2026-03-25 23:39:43.877 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_J_LG_stopgo.csv -> training_data_J_LG_stopgo_target.csv
+2026-03-25 23:39:43.878 | SUCCESS  | ao_compensation_model.app:_run_prep:34 - Data preparation complete.

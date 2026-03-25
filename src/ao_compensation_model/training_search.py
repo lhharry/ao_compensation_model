@@ -222,11 +222,11 @@ def train():
     y_val_phase = y_val[:, -1, :2]
 
     # --- Hyperparameter Search Grid ---
-    gru_units_grid = [256, 128, 64, 32, 16, 8]
-    batch_size_grid = [64]
-    kernel_size_grid = [20, 10, 5]
-    filters_grid = [16, 8, 4, 2]
-    pool_size_grid = [5, 3, 1]
+    gru_units_grid = [8, 16, 32, 64]
+    batch_size_grid = [64, 128]
+    kernel_size_grid = [5, 10, 20]
+    filters_grid = [4, 8, 16]
+    pool_size_grid = [5, 3]
 
     hyperparameters = list(itertools.product(
         gru_units_grid, batch_size_grid, kernel_size_grid, filters_grid, pool_size_grid
