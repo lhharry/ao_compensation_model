@@ -1,0 +1,72 @@
+2026-03-25 14:58:01.082 | INFO     | ao_compensation_model.utils:setup_logger:387 - Logging to 'data\logs\log_file_2026-03-25_14-58-01.log'.
+2026-03-25 14:58:11.835 | INFO     | ao_compensation_model.app:_run_train:41 - Starting GRU training pipeline...
+2026-03-25 14:58:11.836 | WARNING  | ao_compensation_model.training:setup_gpu:72 - No compatible GPU found. TensorFlow will fall back to CPU for training.
+2026-03-25 14:58:12.640 | INFO     | ao_compensation_model.training:train:222 - Model architecture:
+Model: "functional"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┓
+┃ Layer (type)                         ┃ Output Shape                ┃         Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━┩
+│ input_layer (InputLayer)             │ (128, 200, 2)               │               0 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ conv1d (Conv1D)                      │ (128, 200, 8)               │             328 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ batch_normalization                  │ (128, 200, 8)               │              32 │
+│ (BatchNormalization)                 │                             │                 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ zero_padding1d (ZeroPadding1D)       │ (128, 202, 8)               │               0 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ average_pooling1d (AveragePooling1D) │ (128, 200, 8)               │               0 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ gru (GRU)                            │ (128, 64)                   │          14,208 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ dense (Dense)                        │ (128, 2)                    │             130 │
+├──────────────────────────────────────┼─────────────────────────────┼─────────────────┤
+│ phase (UnitNormalization)            │ (128, 2)                    │               0 │
+└──────────────────────────────────────┴─────────────────────────────┴─────────────────┘
+ Total params: 14,698 (57.41 KB)
+ Trainable params: 14,682 (57.35 KB)
+ Non-trainable params: 16 (64.00 B)
+
+
+2026-03-25 14:58:12.653 | INFO     | ao_compensation_model.training:train:225 - Parameters — trainable: 14682  non-trainable: 16  total: 14698
+2026-03-25 14:58:12.765 | INFO     | ao_compensation_model.training:on_train_begin:117 - Training started.
+2026-03-25 14:58:12.766 | INFO     | ao_compensation_model.training:on_train_begin:118 - Hyperparameters:
+  WINDOW_SIZE: 200
+  STRIDE: 20
+  TARGET_LEAD: 0
+  GRU_UNITS: 64
+  DROPOUT_RATE: 0.2
+  FILTERS: 8
+  KERNEL_SIZE: 20
+  POOL_SIZE: 3
+  BATCH_SIZE: 128
+  MAX_EPOCHS: 100
+  LEARNING_RATE: 0.0005
+  TRAINING_DATA_DIR: D:\01_Code\ao_compensation_model\src\ao_compensation_model\dataset\training
+  MODEL_DIR: D:\01_Code\ao_compensation_model\src\ao_compensation_model\model
+2026-03-25 14:58:36.373 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   1 | val_loss: 0.175189
+2026-03-25 14:58:53.242 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   2 | val_loss: 0.158212
+2026-03-25 14:59:12.161 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   3 | val_loss: 0.123930
+2026-03-25 14:59:28.995 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   4 | val_loss: 0.101702
+2026-03-25 14:59:48.620 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   5 | val_loss: 0.102462
+2026-03-25 15:00:05.008 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   6 | val_loss: 0.100845
+2026-03-25 15:00:20.929 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   7 | val_loss: 0.099371
+2026-03-25 15:00:36.601 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   8 | val_loss: 0.096683
+2026-03-25 15:00:56.461 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch   9 | val_loss: 0.092444
+2026-03-25 15:01:12.984 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  10 | val_loss: 0.090530
+2026-03-25 15:01:28.020 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  11 | val_loss: 0.089906
+2026-03-25 15:01:42.489 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  12 | val_loss: 0.089263
+2026-03-25 15:01:57.261 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  13 | val_loss: 0.090833
+2026-03-25 15:02:12.622 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  14 | val_loss: 0.090791
+2026-03-25 15:02:27.623 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  15 | val_loss: 0.089250
+2026-03-25 15:02:42.721 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  16 | val_loss: 0.093224
+2026-03-25 15:02:58.384 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  17 | val_loss: 0.091397
+2026-03-25 15:03:13.118 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  18 | val_loss: 0.093562
+2026-03-25 15:03:28.717 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  19 | val_loss: 0.092497
+2026-03-25 15:03:44.114 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  20 | val_loss: 0.092110
+2026-03-25 15:03:58.929 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  21 | val_loss: 0.091552
+2026-03-25 15:04:13.119 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  22 | val_loss: 0.090961
+2026-03-25 15:04:27.513 | INFO     | ao_compensation_model.training:on_epoch_end:137 - Epoch  23 | val_loss: 0.091009
+2026-03-25 15:04:27.548 | INFO     | ao_compensation_model.training:train:257 - Best model saved as: gru_model.keras (val_loss=0.089250)
+2026-03-25 15:04:29.904 | INFO     | ao_compensation_model.training:train:274 - TFLite model saved as: gru_model_edge.tflite
+2026-03-25 15:04:29.968 | SUCCESS  | ao_compensation_model.app:_run_train:43 - Training complete.
