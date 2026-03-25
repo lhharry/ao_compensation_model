@@ -224,10 +224,7 @@ def align_omega(
     dt: float = 1 / SAMPLING_FREQ,
     fs: int = SAMPLING_FREQ,
     omega_error_threshold: float = 1.0,
-    threshold: float | None = None,
-    amplitude_envelope: np.ndarray | None = None,
-    window_time: float = 1,
-) -> tuple[np.ndarray, np.ndarray, float]:
+) -> np.ndarray:
     """Align AO omega to the offline ground-truth with per-cycle quality check.
 
     For each stride cycle the RMS error between the AO-provided omega and the
@@ -235,21 +232,18 @@ def align_omega(
     *omega_error_threshold* the cycle is replaced by the offline omega;
     otherwise the (potentially more precise) AO omega is kept.
 
+    No stationary masking or ramping is done here — the caller is responsible
+    for zeroing stationary segments (to match phase) and applying ramps.
+
     :param filtered_signal: Bandpass-filtered Hip_x signal (used for peak
-        detection and amplitude envelope).
+        detection).
     :param ao_omega: Raw AO angular-frequency estimate from the device.
     :param time_array: 1-D array of timestamps in seconds.
     :param dt: Sampling period in seconds.
     :param fs: Sampling frequency in Hz.
     :param omega_error_threshold: Max per-cycle RMS error (rad/s) before
         falling back to the offline omega.
-    :param threshold: Amplitude threshold for stationary detection.
-        *None* = auto-compute.
-    :param amplitude_envelope: Pre-computed amplitude envelope (e.g. from
-        align_ao_phase) so omega zeros match phase zeros.  *None* = compute
-        internally.
-    :param window_time: Window length (seconds) for the RMS envelope.
-    :return: (aligned_omega, amplitude_envelope, used_threshold).
+    :return: aligned_omega array.
     """
     # Compute the offline reference omega
     theta_il = filtered_signal  # inter-limb angle approximated by filtered Hip_x
@@ -270,45 +264,7 @@ def align_omega(
             aligned_omega[start:end] = ao_omega[start:end]
         # else: offline_omega already in place
 
-    # Reuse external amplitude envelope if provided, otherwise compute locally
-    if amplitude_envelope is None:
-        window_size = max(1, int(window_time / dt))
-        squared_signal = filtered_signal ** 2
-        mean_squared = np.convolve(
-            squared_signal, np.ones(window_size) / window_size, mode="same"
-        )
-        amplitude_envelope = np.sqrt(mean_squared)
-
-    if threshold is None:
-        if len(peaks) > 0:
-            threshold = STATIONARY_THRESHOLD_RATIO * float(
-                np.median(amplitude_envelope[peaks])
-            )
-        else:
-            threshold = 0.0
-
-    # Zero out stationary segments
-    aligned_omega[amplitude_envelope < threshold] = 0.0
-
-    # Smooth ramp-up / ramp-down at zero↔non-zero transitions
-    ramp_duration = 0.5  # seconds
-    ramp_samples = max(1, int(ramp_duration * fs))
-    is_active = aligned_omega > 0
-    for i in range(1, len(is_active)):
-        # Rising edge: transition from 0 → non-zero
-        if is_active[i] and not is_active[i - 1]:
-            ramp_end = min(i + ramp_samples, len(aligned_omega))
-            n = ramp_end - i
-            ramp = np.linspace(0.0, 1.0, n)
-            aligned_omega[i:ramp_end] *= ramp
-        # Falling edge: transition from non-zero → 0
-        elif not is_active[i] and is_active[i - 1]:
-            ramp_start = max(i - ramp_samples, 0)
-            n = i - ramp_start
-            ramp = np.linspace(1.0, 0.0, n)
-            aligned_omega[ramp_start:i] *= ramp
-
-    return aligned_omega, amplitude_envelope, threshold
+    return aligned_omega
 
 
 def generate_gru_targets(

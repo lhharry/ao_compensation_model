@@ -50,15 +50,29 @@ def prepare_targets(
     gru_targets = generate_gru_targets(tp_cos, tp_sin)
 
     # Align AO omega with offline ground-truth (per-cycle quality check)
-    # Reuse phase's amplitude envelope and threshold so omega=0 matches phase=0
     ao_omega = np.asarray(df["Omega"].values)
     time_seconds = (pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
                     - pd.to_datetime(df["Time"].iloc[0], format="%H:%M:%S.%f"))
     time_array = time_seconds.dt.total_seconds().values
-    aligned_omega, _, _ = align_omega(
+    aligned_omega = align_omega(
         filtered_hip, ao_omega, time_array, fs=fs,
-        threshold=phase_threshold, amplitude_envelope=phase_amplitude,
     )
+
+    # Force omega=0 using the same amplitude envelope & threshold as phase
+    aligned_omega[phase_amplitude < phase_threshold] = 0.0
+
+    # Smooth ramp-up / ramp-down at zero↔non-zero transitions (3.5 s)
+    ramp_samples = max(1, int(3.5 * fs))
+    is_active = aligned_omega > 0
+    for i in range(1, len(is_active)):
+        if is_active[i] and not is_active[i - 1]:          # rising edge
+            ramp_end = min(i + ramp_samples, len(aligned_omega))
+            aligned_omega[i:ramp_end] *= np.linspace(0.0, 1.0, ramp_end - i)
+        elif not is_active[i] and is_active[i - 1]:        # falling edge
+            # Ramp forward: decay from last active value into zero region
+            last_val = aligned_omega[i - 1]
+            ramp_end = min(i + ramp_samples, len(aligned_omega))
+            aligned_omega[i:ramp_end] = last_val * np.linspace(1.0, 0.0, ramp_end - i)
 
     df["target_cos"] = gru_targets[:, 0]
     df["target_sin"] = gru_targets[:, 1]

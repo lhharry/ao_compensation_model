@@ -1,0 +1,12 @@
+2026-03-25 16:22:22.342 | INFO     | ao_compensation_model.utils:setup_logger:366 - Logging to 'data\logs\log_file_2026-03-25_16-22-22.log'.
+2026-03-25 16:22:23.619 | INFO     | ao_compensation_model.app:_run_prep:16 - Stationary threshold: auto
+2026-03-25 16:22:23.620 | INFO     | ao_compensation_model.app:_run_prep:28 - Preparing ground-truth targets from raw data...
+2026-03-25 16:22:44.039 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_H_3km.csv -> training_data_H_3km_target.csv
+2026-03-25 16:22:55.009 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_H_4km.csv -> training_data_H_4km_target.csv
+2026-03-25 16:23:09.000 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_H_4km_stopgo.csv -> training_data_H_4km_stopgo_target.csv
+2026-03-25 16:23:19.765 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_H_5km.csv -> training_data_H_5km_target.csv
+2026-03-25 16:23:25.886 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_H_LG_stopgo.csv -> training_data_H_LG_stopgo_target.csv
+2026-03-25 16:23:32.271 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_H_Slow_LG.csv -> training_data_H_Slow_LG_target.csv
+2026-03-25 16:23:39.156 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_J_3km.csv -> training_data_J_3km_target.csv
+2026-03-25 16:23:55.460 | INFO     | ao_compensation_model.app:_run_prep:33 -   training_data_J_4km.csv -> training_data_J_4km_target.csv
+2026-03-25 16:23:55.462 | SUCCESS  | ao_compensation_model.app:_run_prep:34 - Data preparation complete.
