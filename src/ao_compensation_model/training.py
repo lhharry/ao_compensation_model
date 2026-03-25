@@ -19,13 +19,15 @@ import pandas as pd
 import tensorflow as tf
 from loguru import logger
 from sklearn.preprocessing import RobustScaler
-from tensorflow.keras.losses import Huber
 from tensorflow.keras.callbacks import (
     EarlyStopping,
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, LSTM, Dense, Input, UnitNormalization,Conv1D
+from tensorflow.keras.layers import (
+    GRU, Dense, Input, UnitNormalization, Conv1D,
+    BatchNormalization, AveragePooling1D, ZeroPadding1D,
+)
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
@@ -33,14 +35,17 @@ from tensorflow.keras.regularizers import l2
 from ao_compensation_model.definitions import (
     BATCH_SIZE,
     DROPOUT_RATE,
+    FILTERS,
     GRU_UNITS,
+    KERNEL_SIZE,
     LEARNING_RATE,
     MAX_EPOCHS,
     MODEL_DIR,
+    POOL_SIZE,
     TARGET_LEAD,
     TRAINING_DATA_DIR,
     WINDOW_SIZE,
-    STRIDE
+    STRIDE,
 )
 from ao_compensation_model.utils import create_sliding_windows, setup_logger
 
@@ -58,13 +63,11 @@ def setup_gpu():
     gpus = tf.config.list_physical_devices('GPU')
     if gpus:
         try:
-            # Enable memory growth so TF doesn't hoard all VRAM at startup
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
             logical_gpus = tf.config.list_logical_devices('GPU')
             logger.info(f"Successfully configured GPU. {len(gpus)} Physical GPUs, {len(logical_gpus)} Logical GPUs available.")
         except RuntimeError as e:
-            # Memory growth must be set before GPUs have been initialized
             logger.error(f"RuntimeError during GPU configuration: {e}")
     else:
         logger.warning("No compatible GPU found. TensorFlow will fall back to CPU for training.")
@@ -90,7 +93,7 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 def build_gru_model(
     window_size: int,
-    n_features: int,
+    n_features: int | None = None,
     batch_size: int | None = None,
 ) -> Model:
     """Construct the GRU model architecture.
@@ -101,11 +104,14 @@ def build_gru_model(
     :return: Keras Model (uncompiled).
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
-    x = Conv1D(filters=16, kernel_size=5, padding="same", activation="linear")(inp)
-    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(inp)
-    phase_out = Dense(units=2, activation="linear",kernel_regularizer=l2(0.001))(x)
-    phase_normalized = UnitNormalization(axis=-1, name="phase")(phase_out)
-    omega_out = Dense(units=1, activation="linear", name="omega",kernel_regularizer=l2(0.001))(x)
+    x = Conv1D(filters=FILTERS, kernel_size=KERNEL_SIZE, padding="causal", activation="linear")(inp)
+    x = BatchNormalization()(x)
+    x = ZeroPadding1D(padding=(POOL_SIZE - 1, 0))(x)
+    x = AveragePooling1D(pool_size=POOL_SIZE, strides=1, padding="valid")(x)
+    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(x)
+    phase_out = Dense(units=2, activation="linear", kernel_regularizer=l2(0.001))(x)
+    phase_normalized = UnitNormalization(axis=1, name="phase")(phase_out)
+    omega_out = Dense(units=1, activation="linear", name="omega", kernel_regularizer=l2(0.001))(x)
     return Model(inputs=inp, outputs={"phase": phase_normalized, "omega": omega_out})
 
 class EpochLogger(tf.keras.callbacks.Callback):
@@ -120,6 +126,9 @@ class EpochLogger(tf.keras.callbacks.Callback):
             f"  TARGET_LEAD: {TARGET_LEAD}\n"
             f"  GRU_UNITS: {GRU_UNITS}\n"
             f"  DROPOUT_RATE: {DROPOUT_RATE}\n"
+            f"  FILTERS: {FILTERS}\n"
+            f"  KERNEL_SIZE: {KERNEL_SIZE}\n"
+            f"  POOL_SIZE: {POOL_SIZE}\n"
             f"  BATCH_SIZE: {BATCH_SIZE}\n"
             f"  MAX_EPOCHS: {MAX_EPOCHS}\n"
             f"  LEARNING_RATE: {LEARNING_RATE}\n"
@@ -140,6 +149,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
 def train():
     """Run the full training pipeline: load data, train, and export TFLite."""
     setup_gpu()
+    set_seed(42)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     today_str = date.today().strftime("%Y_%m_%d")
     time_str = pd.Timestamp.now().strftime("%H_%M")
@@ -157,18 +167,18 @@ def train():
         file_data.append((csv_file.name, features, targets))
 
     # --- File-level train/val split to prevent data leakage ---
-    val_subjects = {"Y", "D", "L"} 
+    val_subjects = {"LG"}
 
     # --- Fit scaler on training files  ---
     train_features_for_fit = np.vstack(
         [f for j, (_, f, _) in enumerate(file_data)
-         if csv_files[j].name.split("_")[3][0] not in val_subjects]
+         if csv_files[j].name.split("_")[-3] not in val_subjects]
     )
     scaler = RobustScaler()
     scaler.fit(train_features_for_fit)
     joblib.dump(scaler, scaler_path)
 
-     # --- Build windows: whole files go to train or val ---
+    # --- Build windows: whole files go to train or val ---
     x_train_list, y_train_list = [], []
     x_val_list, y_val_list = [], []
 
@@ -178,7 +188,7 @@ def train():
         if len(x_file) == 0:
             continue
 
-        subject = csv_files[i].name.split("_")[3][0]
+        subject = csv_files[i].name.split("_")[-3]
         if subject in val_subjects:
             x_val_list.append(x_file)
             y_val_list.append(y_file)
@@ -210,13 +220,13 @@ def train():
 
     # Normalize omega targets so loss scale matches phase (~[-1,1])
     omega_scaler = RobustScaler()
-    y_train_omega = omega_scaler.fit_transform(y_train_omega_raw)  # (N, 1)
+    y_train_omega = omega_scaler.fit_transform(y_train_omega_raw)
     y_val_omega = omega_scaler.transform(y_val_omega_raw)
     joblib.dump(omega_scaler, MODEL_DIR / "omega_scaler.pkl")
 
-    model = build_gru_model(WINDOW_SIZE, x_train.shape[2])
+    model = build_gru_model(WINDOW_SIZE, x_train.shape[2], batch_size=BATCH_SIZE)
     model.compile(
-        optimizer=Adam(learning_rate=LEARNING_RATE,clipnorm=1.0),
+        optimizer=Adam(learning_rate=LEARNING_RATE, clipnorm=1.0),
         loss={"phase": "mse", "omega": "mse"},
         loss_weights={"phase": 3.0, "omega": 1.0},
     )
@@ -235,29 +245,17 @@ def train():
     )
 
     callbacks = [
-        ReduceLROnPlateau(
-            monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6, verbose=1
-        ),
-        EarlyStopping(
-            monitor="val_loss", patience=8, restore_best_weights=True, verbose=1
-        ),
-        ModelCheckpoint(
-            filepath=str(model_path),
-            monitor="val_loss",
-            save_best_only=True,
-            verbose=1,
-        ),
+        ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6, verbose=1),
+        EarlyStopping(monitor="val_loss", patience=8, restore_best_weights=True, verbose=1),
+        ModelCheckpoint(filepath=str(model_path), monitor="val_loss", save_best_only=True, verbose=1),
         EpochLogger(),
     ]
-    last_sin = y_train[:, -1, 0]
-    sample_weights = np.where(last_sin == 0, 0.3, 1.0)
 
     history = model.fit(
         x_train,
         {"phase": y_train_phase, "omega": y_train_omega},
         epochs=MAX_EPOCHS,
         batch_size=BATCH_SIZE,
-        sample_weight=sample_weights,
         validation_data=(
             x_val,
             {"phase": y_val_phase, "omega": y_val_omega},
@@ -269,7 +267,7 @@ def train():
     best_val_loss = min(history.history["val_loss"])
     best_model_path = MODEL_DIR / f"{today_str}_{time_str}_{best_val_loss:.4f}"
     os.makedirs(best_model_path)
-    best_model = best_model_path/ f"gru_model.keras"
+    best_model = best_model_path / f"gru_model.keras"
     tflite_path = best_model_path / f"gru_model_edge.tflite"
 
     if model_path.exists():

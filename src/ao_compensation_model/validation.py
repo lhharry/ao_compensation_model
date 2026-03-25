@@ -306,7 +306,7 @@ def validate(csv_name: str) -> ValidationResult:
     :return: A :class:`ValidationResult` with all computed arrays.
     """
     data = load_test_data(TEST_DATA_DIR / csv_name)
-    folder_name = "2026_03_20_14_31_0.2584"
+    folder_name = "2026_03_25_16_33_1.0570"
     x, _, target_sin, target_cos, target_omega = prepare_features_and_targets(
         data, MODEL_DIR / folder_name / "scaler.pkl"
     )
