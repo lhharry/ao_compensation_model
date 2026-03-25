@@ -223,7 +223,7 @@ def train():
 
     # --- Hyperparameter Search Grid ---
     gru_units_grid = [256, 128, 64, 32, 16, 8]
-    batch_size_grid = [256, 128, 64]
+    batch_size_grid = [64]
     kernel_size_grid = [20, 10, 5]
     filters_grid = [16, 8, 4, 2]
     pool_size_grid = [5, 3, 1]
@@ -267,8 +267,8 @@ def train():
         )
 
         callbacks = [
-            ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6, verbose=1),
-            EarlyStopping(monitor="val_loss", patience=8, restore_best_weights=True, verbose=1),
+            ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=1, min_lr=1e-6, verbose=1),
+            EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True, verbose=1),
             ModelCheckpoint(filepath=str(model_path), monitor="val_loss", save_best_only=True, verbose=1),
             EpochLogger(gru_units, batch_size, kernel_size, filters, pool_size),
         ]
