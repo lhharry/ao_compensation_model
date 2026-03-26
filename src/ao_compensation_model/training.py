@@ -101,11 +101,13 @@ def build_gru_model(
     :return: Keras Model (uncompiled).
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
+    
     x_filter = Conv1D(filters=FILTERS, kernel_size=KERNEL_SIZE, padding="causal", activation="linear")(inp)
     x_norm = BatchNormalization()(x_filter)
     x_padded = ZeroPadding1D(padding=(POOL_SIZE - 1, 0))(x_norm)
     x_pool = AveragePooling1D(pool_size=POOL_SIZE, strides=1, padding="valid")(x_padded)
     x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(x_pool)
+
     phase_out = Dense(units=2, activation="linear", kernel_regularizer=l2(0.001))(x)
     phase_normalized = UnitNormalization(axis=1, name="phase")(phase_out)
     return Model(inputs=inp, outputs=phase_normalized)
