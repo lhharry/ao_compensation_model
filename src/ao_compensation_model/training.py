@@ -161,12 +161,12 @@ def train():
         file_data.append((csv_file.name, features, targets))
 
     # --- File-level train/val split to prevent data leakage ---
-    val_subjects = {"LG"} 
+    val_subjects = {"3km"} 
 
     # --- Fit scaler on training files  ---
     train_features_for_fit = np.vstack(
         [f for j, (_, f, _) in enumerate(file_data)
-         if csv_files[j].name.split("_")[-3] not in val_subjects]
+         if csv_files[j].name.split("_")[-2] not in val_subjects]
     )
     scaler = RobustScaler()
     scaler.fit(train_features_for_fit)
@@ -182,7 +182,7 @@ def train():
         if len(x_file) == 0:
             continue
 
-        subject = csv_files[i].name.split("_")[-3]
+        subject = csv_files[i].name.split("_")[-2]
         if subject in val_subjects:
             x_val_list.append(x_file)
             y_val_list.append(y_file)
