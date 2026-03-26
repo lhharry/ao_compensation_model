@@ -1,3 +1,4 @@
+import math
 import os
 import joblib
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -17,7 +18,7 @@ from ao_compensation_model.definitions import (
 fs = 100 # Sampling frequency (Hz)
 dt = 1 / fs
 script_dir = Path(__file__).resolve().parent
-path = 'model\\2026_03_24_18_43_0.1026'
+path = 'model\\2026_03_26_15_45_0.0212'
 model_path= os.path.join(script_dir, path, 'gru_model_edge.tflite')
 scaler_path = os.path.join(script_dir, path,'scaler.pkl')
 
@@ -25,6 +26,8 @@ _stream_state = {
     "model": None,
     "scaler": joblib.load(scaler_path),
     "feature_buffer": deque(maxlen=WINDOW_SIZE),
+    "filtered_sin": None,  # State for the EMA filter (sin)
+    "filtered_cos": None,  # State for the EMA filter (cos)
 }
 
 # -----------------------------------------------------------------
@@ -71,21 +74,34 @@ def build_model():
 # -----------------------------------------------------------------
 # 5. Inference & Alignment
 # -----------------------------------------------------------------
-def model_inference(model, input_angle):
+def model_inference(model, input_angle, alpha=0.05):
     input_details = model.get_input_details()
     output_details = model.get_output_details()
     model.set_tensor(input_details[0]['index'], input_angle)
     model.invoke()
     y_pred = model.get_tensor(output_details[0]['index'])[0]
-    pred_sin = y_pred[0]
-    pred_cos = y_pred[1]
+    raw_sin = y_pred[0]
+    raw_cos = y_pred[1]
+    
+    # Apply Exponential Moving Average (EMA) filter
+    if _stream_state["filtered_sin"] is None:
+        _stream_state["filtered_sin"] = raw_sin
+        _stream_state["filtered_cos"] = raw_cos
+    else:
+        _stream_state["filtered_sin"] = alpha * raw_sin + (1.0 - alpha) * _stream_state["filtered_sin"]
+        _stream_state["filtered_cos"] = alpha * raw_cos + (1.0 - alpha) * _stream_state["filtered_cos"]
+        
+    pred_sin = _stream_state["filtered_sin"]
+    pred_cos = _stream_state["filtered_cos"]
     predicted_phase = np.arctan2(pred_sin, pred_cos)
-    return float(predicted_phase)
+    return float(predicted_phase), float(pred_sin), float(pred_cos)
 
 
 def reset_stream_state():
     """Reset stream buffers so a new sequence starts cleanly."""
     _stream_state["feature_buffer"].clear()
+    _stream_state["filtered_sin"] = None
+    _stream_state["filtered_cos"] = None
 
 def load_model(input_angle, input_velocity):
     """Load/use the pre-trained GRU model and return one predicted phase value."""
@@ -93,9 +109,9 @@ def load_model(input_angle, input_velocity):
         _stream_state["model"] = build_model()
     input_features = data_preparation(input_angle, input_velocity)
     if input_features is None:
-        return 0.0
-    gait_phase_prediction = model_inference(_stream_state["model"], input_features)
-    return gait_phase_prediction
+        return 0.0, 0.0, 0.0
+    gait_phase_prediction, sin, cos= model_inference(_stream_state["model"], input_features)
+    return gait_phase_prediction, sin, cos
 
 
 def predict_sequence(input_angle, input_velocity) -> np.ndarray:
@@ -110,7 +126,7 @@ def predict_sequence(input_angle, input_velocity) -> np.ndarray:
 def plot_prediction(data: dict[str, np.ndarray], predicted_phase: np.ndarray) -> None:
     """Plot kinematics and model-predicted phase, similar to validation view."""
     t = np.arange(len(predicted_phase)) * dt
-    _, axs = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
+    _, axs = plt.subplots(4, 1, figsize=(14, 10), sharex=True)
 
     axs[0].set_title("1. Hip Angle", fontsize=14, fontweight="bold")
     axs[0].plot(t, data["raw_angle"], label="Raw Hip Angle", color="blue", alpha=0.8)
@@ -120,19 +136,26 @@ def plot_prediction(data: dict[str, np.ndarray], predicted_phase: np.ndarray) ->
 
     axs[1].set_title("2. Hip Velocity", fontsize=14, fontweight="bold")
     axs[1].plot(t, data["angular_velocity"], label="Raw Hip Velocity", color="blue", alpha=0.8)
-
     axs[1].set_ylabel("Velocity")
     axs[1].legend(loc="upper right")
     axs[1].grid(True, alpha=0.3)
 
-    axs[2].set_title("3. Model Predicted Phase", fontsize=14, fontweight="bold")
-    axs[2].plot(t, predicted_phase, label="Predicted Phase (GRU)", color="green", linewidth=2)
-    axs[2].set_yticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
-    axs[2].set_yticklabels([r"$-\pi$", r"$-\pi/2$", "0", r"$\pi/2$", r"$\pi$"])
+    # draw the sin and cos curves for reference
+    axs[2].plot(t, predicted_phase[:, 1], label="Predicted Sin", color="orange", alpha=0.7)
+    axs[2].plot(t, predicted_phase[:, 2], label="Predicted Cos", color="purple", alpha=0.7)
     axs[2].set_ylabel("Phase (Rad)")
     axs[2].set_xlabel("Time (Seconds)")
     axs[2].legend(loc="upper right")
     axs[2].grid(True, alpha=0.3)
+
+    axs[3].set_title("3. Model Predicted Phase", fontsize=14, fontweight="bold")
+    axs[3].plot(t, predicted_phase[:, 0], label="Predicted Phase (GRU)", color="green", linewidth=2)
+    axs[3].set_yticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
+    axs[3].set_yticklabels([r"$-\pi$", r"$-\pi/2$", "0", r"$\pi/2$", r"$\pi$"])
+    axs[3].set_ylabel("Phase (Rad)")
+    axs[3].set_xlabel("Time (Seconds)")
+    axs[3].legend(loc="upper right")
+    axs[3].grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
