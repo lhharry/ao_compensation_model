@@ -104,14 +104,18 @@ def build_gru_model(
     :return: Keras Model (uncompiled).
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
-    x = Conv1D(filters=FILTERS, kernel_size=KERNEL_SIZE, padding="causal", activation="linear")(inp)
-    x = BatchNormalization()(x)
-    x = ZeroPadding1D(padding=(POOL_SIZE - 1, 0))(x)
-    x = AveragePooling1D(pool_size=POOL_SIZE, strides=1, padding="valid")(x)
-    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(x)
+
+    x_1dconv = Conv1D(filters=FILTERS, kernel_size=KERNEL_SIZE, padding="causal", activation="linear")(inp)
+    x_batchnorm = BatchNormalization()(x_1dconv)
+    x_zeropad = ZeroPadding1D(padding=(POOL_SIZE - 1, 0))(x_batchnorm)
+    x_pool = AveragePooling1D(pool_size=POOL_SIZE, strides=1, padding="valid")(x_zeropad)
+    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(x_pool)
+    x_omega = GRU(units=8, return_sequences=False, dropout=DROPOUT_RATE)(x_pool)
+
     phase_out = Dense(units=2, activation="linear", kernel_regularizer=l2(0.001))(x)
     phase_normalized = UnitNormalization(axis=1, name="phase")(phase_out)
-    omega_out = Dense(units=1, activation="linear", name="omega", kernel_regularizer=l2(0.001))(x)
+
+    omega_out = Dense(units=1, activation="linear", name="omega", kernel_regularizer=l2(0.001))(x_omega)
     return Model(inputs=inp, outputs={"phase": phase_normalized, "omega": omega_out})
 
 class EpochLogger(tf.keras.callbacks.Callback):
@@ -228,7 +232,7 @@ def train():
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE, clipnorm=1.0),
         loss={"phase": "mse", "omega": "mse"},
-        loss_weights={"phase": 3.0, "omega": 1.0},
+        loss_weights={"phase": 1.0, "omega": 2.0},
     )
 
     # --- Log model structure and parameter counts ---

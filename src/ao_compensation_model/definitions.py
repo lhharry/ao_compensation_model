@@ -35,7 +35,7 @@ STATIONARY_THRESHOLD_RATIO: float = 0.3
 # --- GRU Model ---
 WINDOW_SIZE: int = 200
 STRIDE: int = 20
-GRU_UNITS: int = 64
+GRU_UNITS: int = 16
 DROPOUT_RATE: float = 0.2
 BATCH_SIZE: int = 128
 MAX_EPOCHS: int = 100
@@ -43,7 +43,7 @@ LEARNING_RATE: float = 0.0005
 VAL_SPLIT: float = 0.2
 TARGET_LEAD: int = 0
 KERNEL_SIZE: int = 20
-FILTERS: int = 8
+FILTERS: int = 16
 POOL_SIZE: int = 3
 
 @dataclass
