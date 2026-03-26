@@ -177,7 +177,7 @@ def train():
     # --- Fit scaler on training files  ---
     train_features_for_fit = np.vstack(
         [f for j, (_, f, _) in enumerate(file_data)
-         if csv_files[j].name.split("_")[-2] not in val_subjects]
+         if csv_files[j].name.split("_")[-3] not in val_subjects]
     )
     scaler = RobustScaler()
     scaler.fit(train_features_for_fit)
@@ -193,7 +193,7 @@ def train():
         if len(x_file) == 0:
             continue
 
-        subject = csv_files[i].name.split("_")[-2]
+        subject = csv_files[i].name.split("_")[-3]
         if subject in val_subjects:
             x_val_list.append(x_file)
             y_val_list.append(y_file)
@@ -222,10 +222,10 @@ def train():
     y_val_phase = y_val[:, -1, :2]
 
     # --- Hyperparameter Search Grid ---
-    gru_units_grid = [8, 16, 32, 64]
-    batch_size_grid = [64, 128]
-    kernel_size_grid = [5, 10, 20]
-    filters_grid = [4, 8, 16]
+    gru_units_grid = [32]
+    batch_size_grid = [256]
+    kernel_size_grid = [10, 20, 30]
+    filters_grid =  [8, 16, 32]
     pool_size_grid = [5, 3]
 
     hyperparameters = list(itertools.product(
@@ -311,7 +311,7 @@ def train():
             logger.info("TFLite model saved as: {}", tflite_path.name)
             joblib.dump(scaler, str(best_model_path / "scaler.pkl"))
 
-        if best_val_loss < best_overall_val_loss:
+        if best_val_loss < 0.177301:
             best_overall_val_loss = best_val_loss
             best_overall_config = (gru_units, batch_size, kernel_size, filters, pool_size)
             logger.info("*** New best overall config! Val Loss: {:.6f} ***", best_val_loss)

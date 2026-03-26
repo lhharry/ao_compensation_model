@@ -36,7 +36,7 @@ def _run_prep(file: str | None, threshold: float | None) -> None:
 
 def _run_train(file: str | None, threshold: float | None) -> None:
     """Train the GRU model."""
-    from ao_compensation_model.training import train
+    from ao_compensation_model.training_search import train
 
     logger.info("Starting GRU training pipeline...")
     train()
