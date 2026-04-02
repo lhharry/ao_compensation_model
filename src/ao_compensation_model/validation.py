@@ -18,7 +18,7 @@ from ao_compensation_model.definitions import (
 fs = 100 # Sampling frequency (Hz)
 dt = 1 / fs
 script_dir = Path(__file__).resolve().parent
-path = 'model\\2026_03_26_15_45_0.0212'
+path = 'model\\2026_03_26_22_54_0.0713'
 model_path= os.path.join(script_dir, path, 'gru_model_edge.tflite')
 scaler_path = os.path.join(script_dir, path,'scaler.pkl')
 
@@ -74,26 +74,30 @@ def build_model():
 # -----------------------------------------------------------------
 # 5. Inference & Alignment
 # -----------------------------------------------------------------
-def model_inference(model, input_angle, alpha=0.05):
+def model_inference(model, input_angle, alpha=0.1):
     input_details = model.get_input_details()
     output_details = model.get_output_details()
     model.set_tensor(input_details[0]['index'], input_angle)
     model.invoke()
     y_pred = model.get_tensor(output_details[0]['index'])[0]
-    raw_sin = y_pred[0]
-    raw_cos = y_pred[1]
-    
-    # Apply Exponential Moving Average (EMA) filter
-    if _stream_state["filtered_sin"] is None:
-        _stream_state["filtered_sin"] = raw_sin
-        _stream_state["filtered_cos"] = raw_cos
-    else:
-        _stream_state["filtered_sin"] = alpha * raw_sin + (1.0 - alpha) * _stream_state["filtered_sin"]
-        _stream_state["filtered_cos"] = alpha * raw_cos + (1.0 - alpha) * _stream_state["filtered_cos"]
-        
-    pred_sin = _stream_state["filtered_sin"]
-    pred_cos = _stream_state["filtered_cos"]
+    pred_sin = y_pred[-1][0]
+    pred_cos = y_pred[-1][1]
     predicted_phase = np.arctan2(pred_sin, pred_cos)
+    
+    # raw_sin = y_pred[-1][0]
+    # raw_cos = y_pred[-1][1]
+    
+    # # Apply Exponential Moving Average (EMA) filter
+    # if _stream_state["filtered_sin"] is None:
+    #     _stream_state["filtered_sin"] = raw_sin
+    #     _stream_state["filtered_cos"] = raw_cos
+    # else:
+    #     _stream_state["filtered_sin"] = alpha * raw_sin + (1.0 - alpha) * _stream_state["filtered_sin"]
+    #     _stream_state["filtered_cos"] = alpha * raw_cos + (1.0 - alpha) * _stream_state["filtered_cos"]
+        
+    # pred_sin = _stream_state["filtered_sin"]
+    # pred_cos = _stream_state["filtered_cos"]
+    # predicted_phase = np.arctan2(pred_sin, pred_cos)
     return float(predicted_phase), float(pred_sin), float(pred_cos)
 
 

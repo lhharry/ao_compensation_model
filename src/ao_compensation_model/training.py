@@ -89,6 +89,26 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     features = np.column_stack([raw_angle, angular_velocity])
     return features, targets
 
+def continuity_mse_loss(lambda_smooth=2.0):
+    """
+    Custom loss function combining MSE and a temporal smoothness penalty.
+    :param lambda_smooth: Weight of the smoothness penalty. Higher = smoother.
+    """
+    def loss(y_true, y_pred):
+        # 1. Standard Mean Squared Error (Accuracy)
+        mse = tf.reduce_mean(tf.square(y_true - y_pred))
+        
+        # 2. Smoothness Penalty (Continuity)
+        # Calculate the difference between consecutive time steps in the prediction
+        # y_pred shape: (batch_size, window_size, 2)
+        diff1 = y_pred[:, 1:, :] - y_pred[:, :-1, :]
+        diff2 = diff1[:, 1:, :] - diff1[:, :-1, :]
+        smoothness_penalty = tf.reduce_mean(tf.square(diff2)) + tf.reduce_mean(tf.square(diff1))
+        
+        return mse + lambda_smooth * smoothness_penalty
+
+    return loss
+
 def build_gru_model(
     window_size: int,
     n_features: int | None = None,
@@ -106,10 +126,10 @@ def build_gru_model(
     x_norm = BatchNormalization()(x_filter)
     x_padded = ZeroPadding1D(padding=(POOL_SIZE - 1, 0))(x_norm)
     x_pool = AveragePooling1D(pool_size=POOL_SIZE, strides=1, padding="valid")(x_padded)
-    x = GRU(units=GRU_UNITS, return_sequences=False, dropout=DROPOUT_RATE)(x_pool)
+    x = GRU(units=GRU_UNITS, return_sequences=True, dropout=DROPOUT_RATE)(x_pool)
 
     phase_out = Dense(units=2, activation="linear", kernel_regularizer=l2(0.001))(x)
-    phase_normalized = UnitNormalization(axis=1, name="phase")(phase_out)
+    phase_normalized = UnitNormalization(axis=-1, name="phase")(phase_out)
     return Model(inputs=inp, outputs=phase_normalized)
 
 class EpochLogger(tf.keras.callbacks.Callback):
@@ -209,13 +229,13 @@ def train():
     idx = np.random.permutation(len(x_train))
     x_train, y_train = x_train[idx], y_train[idx]
 
-    y_train_phase = y_train[:, -1, :2]         # (N, 2)
-    y_val_phase = y_val[:, -1, :2]
+    y_train_phase = y_train[:, :, :2]         
+    y_val_phase = y_val[:, :, :2]
 
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2],batch_size=BATCH_SIZE)
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE, clipnorm=1.0),
-        loss="mse",
+        loss=continuity_mse_loss(lambda_smooth=2.0),
     )
 
     # --- Log model structure and parameter counts ---
