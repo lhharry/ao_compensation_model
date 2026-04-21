@@ -9,7 +9,6 @@ from ao_compensation_model.definitions import LogLevel
 from ao_compensation_model.utils import (
     RealTimeBandpassFilter,
     align_ao_phase,
-    align_omega,
     bandpass_filter,
     create_sliding_windows,
     create_timestamped_filepath,
@@ -177,33 +176,6 @@ def test_align_ao_phase_manual_threshold():
     ao_phase = np.mod(2 * np.pi * 1.0 * t + 0.5, 2 * np.pi) - np.pi
     _, _, used_thr = align_ao_phase(filtered, ao_phase, dt=1 / fs, threshold=0.42)
     assert used_thr == 0.42
-
-
-def test_align_omega_smooth_boundaries():
-    """align_omega should avoid abrupt jumps at source/stop-go boundaries."""
-    fs = 100
-    t = np.arange(0, 10, 1 / fs)
-
-    # Stop-go-stop-go pattern.
-    walking = ((t >= 1.0) & (t < 3.5)) | ((t >= 5.0) & (t < 8.0))
-    signal = np.where(walking, 10 * np.sin(2 * np.pi * 1.0 * t), 0.0)
-    filtered = bandpass_filter(signal, fs=fs)
-
-    # AO omega starts near zero in walking segments to trigger offline fallback.
-    ao_omega = np.where(walking, 0.001, 0.0)
-
-    aligned_omega, _, _ = align_omega(
-        filtered,
-        ao_omega,
-        t,
-        dt=1 / fs,
-        fs=fs,
-        ao_near_zero_threshold=1.0,
-        transition_time=0.2,
-    )
-
-    max_step = np.max(np.abs(np.diff(aligned_omega)))
-    assert max_step < 1.0
 
 
 def test_align_ao_phase_rejects_large_boundary_jumps():

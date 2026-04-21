@@ -19,8 +19,6 @@ def test_preprocess_one_csv(tmp_path):
             "Hip_x": 10 * np.sin(2 * np.pi * t / 100),
             "Hip_x_ao": np.linspace(0, 6 * np.pi, n),
             "Hip_vel": np.random.default_rng(0).standard_normal(n),
-            "Hip_x_omega": 3.0 * np.ones(n),
-            "Hip_x_domega": 0.1 * np.ones(n),
             "target_sin": np.sin(np.linspace(0, np.pi, n)),
             "target_cos": np.cos(np.linspace(0, np.pi, n)),
         }

@@ -15,7 +15,6 @@ from ao_compensation_model.definitions import (
 )
 from ao_compensation_model.utils import (
     align_ao_phase,
-    align_omega,
     bandpass_filter,
     generate_gru_targets,
 )
@@ -49,18 +48,8 @@ def prepare_targets(
     # Compute GRU targets (delta-phi decomposed into cos and sin)
     gru_targets = generate_gru_targets(tp_cos, tp_sin)
 
-    # Align AO omega with offline ground-truth (per-cycle quality check)
-    ao_omega = np.asarray(df["Omega"].values)
-    time_seconds = (pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
-                    - pd.to_datetime(df["Time"].iloc[0], format="%H:%M:%S.%f"))
-    time_array = time_seconds.dt.total_seconds().values
-    aligned_omega, _, _ = align_omega(
-        filtered_hip, ao_omega, time_array, fs=fs, threshold=threshold,
-    )
-
     df["target_cos"] = gru_targets[:, 0]
     df["target_sin"] = gru_targets[:, 1]
-    df["target_omega"] = aligned_omega
     df.to_csv(output_path, index=False, sep=";")
 
 
@@ -84,7 +73,7 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=None):
     tp_sin = np.sin(aligned_phase)
     gru_targets = generate_gru_targets(tp_cos, tp_sin)
 
-    _, axs = plt.subplots(5, 1, figsize=(14, 12), sharex=True)
+    _, axs = plt.subplots(4, 1, figsize=(14, 10), sharex=True)
 
     axs[0].set_title("Step 1: Raw Kinematics vs Filtered Signal")
     axs[0].plot(t, raw_hip_angle, label="Raw Hip Angle", color="gray", alpha=0.6)
@@ -128,14 +117,6 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=None):
     axs[3].set_xlabel("Time")
     axs[3].grid(True, alpha=0.3)
     axs[3].legend()
-
-    axs[4].set_title("Step 5: Omega Target (Aligned Omega)")
-    axs[4].plot(t, df["target_omega"], label="Target Omega", color="brown")
-    axs[4].plot(t, df["Omega"], label="Raw AO Omega", color="red", alpha=0.5)
-    axs[4].grid(True, alpha=0.3)
-    axs[4].set_ylabel("Angular Velocity (Rad/s)")
-    axs[4].set_xlabel("Time")
-    axs[4].legend()
     plt.tight_layout()
     plt.show()
 

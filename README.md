@@ -10,7 +10,7 @@ A GRU-based compensation model that improves the performance of adaptive oscilla
 
 | Step | Command | Description |
 |------|---------|-------------|
-| 1 | `prep` | Bandpass-filters raw IMU hip angles, aligns AO phase, and computes `target_cos`, `target_sin`, and `target_omega` training targets. |
+| 1 | `prep` | Bandpass-filters raw IMU hip angles, aligns AO phase, and computes `target_cos` and `target_sin` training targets. |
 | 2 | `train` | Trains a GRU network on sliding windows of AO features and exports an optimized TFLite model. |
 | 3 | `validate` | Runs frame-by-frame TFLite inference on test data and visualises predicted phase and its sin/cos outputs alongside raw kinematics. |
 | 4 | `txt2csv` | Converts raw sensor text files (tab / comma / semicolon delimited) in a folder to semicolon-delimited CSVs. |

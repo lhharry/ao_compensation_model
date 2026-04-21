@@ -7,9 +7,7 @@ from pathlib import Path
 
 import numpy as np
 from loguru import logger
-from scipy.interpolate import interp1d
 from scipy.signal import butter, filtfilt, find_peaks, lfilter, lfilter_zi
-from typing import cast
 
 from ao_compensation_model.definitions import (
     BANDPASS_HIGHCUT,
@@ -171,7 +169,7 @@ def align_ao_phase(
         else:
             threshold = 0.0
 
-    # Keep phase continuous in stationary segments to avoid artificial 180° jumps.
+    # Keep phase continuous in stationary segments to avoid artificial 180-degree jumps.
     stationary_mask = amplitude_envelope < threshold
     if np.any(stationary_mask):
         for i in range(1, len(aligned_phase)):
@@ -186,162 +184,6 @@ def align_ao_phase(
                 aligned_phase[:] = 0.0
 
     return aligned_phase, amplitude_envelope, threshold
-
-
-def calculate_offline_omega(
-    time_array: np.ndarray,
-    peaks: np.ndarray,
-) -> np.ndarray:
-    """Calculate offline fundamental angular frequency from pre-detected peaks.
-
-    Computes omega = 2*pi / stride_period for each consecutive peak pair and
-    interpolates linearly to produce a continuous curve.
-
-    :param time_array: 1-D array of corresponding timestamps in seconds.
-    :param peaks: 1-D array of peak indices (stride boundaries).
-    :return: 1-D array of continuous offline angular frequency (rad/s).
-    """
-    if len(peaks) < 2:
-        return np.zeros_like(time_array)
-
-    # Step 3: Stride period and discrete omega
-    peak_times = time_array[peaks]
-    stride_periods = np.diff(peak_times)
-    omega_discrete = 2 * np.pi / stride_periods
-
-    # Step 4: Cubic interpolation for a continuous omega curve
-    midpoints = peak_times[:-1] + stride_periods / 2
-    interp_func = interp1d(
-        midpoints, omega_discrete, kind="cubic",
-        bounds_error=False, fill_value=cast(float, "extrapolate"),
-    )
-    omega_continuous = interp_func(time_array)
-
-    # Step 5: Zero out non-walking segments
-    max_stride_duration = 2.5  # seconds
-    for i, period in enumerate(stride_periods):
-        if period > max_stride_duration:
-            omega_continuous[peaks[i] : peaks[i + 1]] = 0.0
-
-    omega_continuous[: peaks[0]] = 0.0
-    omega_continuous[peaks[-1] :] = 0.0
-
-    # Prevent negative frequencies from spline overshoot
-    omega_continuous = np.maximum(omega_continuous, 0.0)
-
-    return omega_continuous
-
-
-def align_omega(
-    filtered_signal: np.ndarray,
-    ao_omega: np.ndarray,
-    time_array: np.ndarray,
-    dt: float = 1 / SAMPLING_FREQ,
-    fs: int = SAMPLING_FREQ,
-    ao_near_zero_threshold: float = 1.0,
-    threshold: float | None = None,
-    window_time: float = 1,
-    transition_time: float = 0.5,
-) -> tuple[np.ndarray, np.ndarray, float]:
-    """Build omega ground truth: use AO omega when good, offline omega when AO hasn't converged.
-
-    AO omega is generally smooth and accurate during steady-state walking.
-    Offline omega (from peak-to-peak stride timing) is only used as a fallback
-    for cycles where AO omega is near zero (not yet converged) but the person
-    is clearly walking.
-
-    :param filtered_signal: Bandpass-filtered Hip_x signal.
-    :param ao_omega: Raw AO angular-frequency estimate from the device.
-    :param time_array: 1-D array of timestamps in seconds.
-    :param dt: Sampling period in seconds.
-    :param fs: Sampling frequency in Hz.
-    :param ao_near_zero_threshold: If the mean AO omega for a cycle is below
-        this value (rad/s), assume AO hasn't converged and use offline omega.
-    :param threshold: Amplitude threshold for stationary detection.
-        *None* = auto-compute.
-    :param window_time: Window length (seconds) for the RMS envelope.
-    :param transition_time: Duration (seconds) of linear fade-in/out applied
-        around stationary boundaries to avoid abrupt jumps.
-    :return: (aligned_omega, amplitude_envelope, used_threshold).
-    """
-    # Hip_x peaks define stride boundaries (same peaks used for phase alignment)
-    min_distance = int(0.99 / (BANDPASS_HIGHCUT * dt))
-    min_prominence = 0.2 * (np.max(filtered_signal) - np.min(filtered_signal))
-    peaks, _ = find_peaks(filtered_signal, height=0, distance=min_distance, prominence=min_prominence)
-
-    # Compute the offline reference omega from the same peaks
-    offline_omega = calculate_offline_omega(time_array, peaks)
-
-    # Start with AO omega; only patch cycles where AO hasn't converged yet
-    aligned_omega = np.copy(ao_omega)
-    source_is_offline = np.zeros(len(aligned_omega), dtype=bool)
-
-    for i in range(len(peaks) - 1):
-        start, end = peaks[i], peaks[i + 1]
-        cycle_ao_mean = np.mean(np.abs(ao_omega[start:end]))
-        if cycle_ao_mean < ao_near_zero_threshold:
-            # AO omega near zero during walking → hasn't converged, use offline
-            aligned_omega[start:end] = offline_omega[start:end]
-            source_is_offline[start:end] = True
-
-    # Smooth source-switch boundaries (AO <-> offline) to avoid hard steps.
-    ramp_len = max(1, int(transition_time / dt))
-    source_switches = np.flatnonzero(
-        source_is_offline[:-1] != source_is_offline[1:]
-    ) + 1
-    for idx in source_switches:
-        left = max(0, idx - ramp_len)
-        right = min(len(aligned_omega), idx + ramp_len)
-        if right - left > 1:
-            aligned_omega[left:right] = np.linspace(
-                float(aligned_omega[left]),
-                float(aligned_omega[right - 1]),
-                right - left,
-            )
-
-    # RMS amplitude envelope (same as align_ao_phase)
-    window_size = max(1, int(window_time / dt))
-    squared_signal = filtered_signal ** 2
-    mean_squared = np.convolve(
-        squared_signal, np.ones(window_size) / window_size, mode="same"
-    )
-    amplitude_envelope = np.sqrt(mean_squared)
-
-    if threshold is None:
-        if len(peaks) > 0:
-            threshold = STATIONARY_THRESHOLD_RATIO * float(
-                np.median(amplitude_envelope[peaks])
-            )
-        else:
-            threshold = 0.0
-
-    stationary_mask = amplitude_envelope < threshold
-    aligned_omega[stationary_mask] = 0.0
-
-    # Smooth stop/go boundaries with short linear ramps.
-    ramp_len = max(1, int(transition_time / dt))
-    enter_stationary = np.flatnonzero(~stationary_mask[:-1] & stationary_mask[1:]) + 1
-    leave_stationary = np.flatnonzero(stationary_mask[:-1] & ~stationary_mask[1:]) + 1
-
-    for idx in enter_stationary:
-        left = max(0, idx - ramp_len)
-        if left < idx:
-            start_value = float(aligned_omega[left])
-            aligned_omega[left:idx] = np.linspace(
-                start_value, 0.0, idx - left, endpoint=False
-            )
-
-    for idx in leave_stationary:
-        right = min(len(aligned_omega), idx + ramp_len)
-        if idx < right:
-            end_value = float(aligned_omega[right - 1])
-            aligned_omega[idx:right] = np.linspace(
-                0.0, end_value, right - idx, endpoint=False
-            )
-
-    aligned_omega = np.maximum(aligned_omega, 0.0)
-
-    return aligned_omega, amplitude_envelope, threshold
 
 
 def generate_gru_targets(
