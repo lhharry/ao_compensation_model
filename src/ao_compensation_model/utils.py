@@ -9,6 +9,7 @@ import numpy as np
 from loguru import logger
 from scipy.interpolate import interp1d
 from scipy.signal import butter, filtfilt, find_peaks, lfilter, lfilter_zi
+from typing import cast
 
 from ao_compensation_model.definitions import (
     BANDPASS_HIGHCUT,
@@ -212,7 +213,7 @@ def calculate_offline_omega(
     midpoints = peak_times[:-1] + stride_periods / 2
     interp_func = interp1d(
         midpoints, omega_discrete, kind="cubic",
-        bounds_error=False, fill_value="extrapolate",
+        bounds_error=False, fill_value=cast(float, "extrapolate"),
     )
     omega_continuous = interp_func(time_array)
 

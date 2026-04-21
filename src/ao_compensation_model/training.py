@@ -252,7 +252,10 @@ def train():  # noqa: PLR0915
 
     # --- Log model structure and parameter counts ---
     summary_buf = io.StringIO()
-    model.summary(print_fn=lambda line: summary_buf.write(line + "\n"))
+    def _write_summary_line(line: str) -> None:
+        summary_buf.write(line + "\n")
+
+    model.summary(print_fn=_write_summary_line)
     logger.info("Model architecture:\n{}", summary_buf.getvalue())
     trainable_params = sum(int(tf.size(w)) for w in model.trainable_weights)
     non_trainable_params = sum(int(tf.size(w)) for w in model.non_trainable_weights)

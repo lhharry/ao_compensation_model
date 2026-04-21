@@ -10,9 +10,9 @@ A GRU-based compensation model that improves the performance of adaptive oscilla
 
 | Step | Command | Description |
 |------|---------|-------------|
-| 1 | `prep` | Bandpass-filters raw IMU hip angles, extracts ground-truth gait phase, and computes delta-phi training targets. |
+| 1 | `prep` | Bandpass-filters raw IMU hip angles, aligns AO phase, and computes `target_cos`, `target_sin`, and `target_omega` training targets. |
 | 2 | `train` | Trains a GRU network on sliding windows of AO features and exports an optimized TFLite model. |
-| 3 | `validate` | Runs frame-by-frame TFLite inference on test data and visualises AO phase vs. enhanced phase vs. ground truth. |
+| 3 | `validate` | Runs frame-by-frame TFLite inference on test data and visualises predicted phase and its sin/cos outputs alongside raw kinematics. |
 | 4 | `txt2csv` | Converts raw sensor text files (tab / comma / semicolon delimited) in a folder to semicolon-delimited CSVs. |
 
 ## Install
@@ -94,7 +94,7 @@ uv run python -m ao_compensation_model txt2csv --file /path/to/folder
 ```python
 from ao_compensation_model.training import build_gru_model
 from ao_compensation_model.utils import bandpass_filter, align_ao_phase
-from ao_compensation_model.validation import validate
+from ao_compensation_model.validation import validate_prediction
 ```
 
 ## Development
