@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import numpy as np
+from loguru import logger
 
 from ao_compensation_model.definitions import LogLevel
 from ao_compensation_model.utils import (
@@ -23,6 +24,7 @@ def test_logger_init() -> None:
         log_dir_path = Path(log_dir)
         log_filepath = setup_logger(filename="log_file", log_dir=log_dir_path)
         assert Path(log_filepath).exists()
+        logger.remove()
     assert not Path(log_filepath).exists()
 
 
@@ -110,7 +112,8 @@ def test_create_sliding_windows_shape():
     x, y = create_sliding_windows(data, target, window_size, stride=1)
     assert x.shape[1] == window_size
     assert x.shape[2] == f
-    assert y.shape[1] == 2
+    assert y.shape[1] == window_size
+    assert y.shape[2] == 2
     assert x.shape[0] == y.shape[0]
 
 

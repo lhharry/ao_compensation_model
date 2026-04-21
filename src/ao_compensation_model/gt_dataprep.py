@@ -33,7 +33,8 @@ def prepare_targets(
     df = pd.read_csv(input_path, sep=";")
 
     raw_hip_angle = np.asarray(df["Hip_x"].values)
-    ao_phase = np.asarray(df["GP_AO"].values)
+    ao_col = "GP_AO" if "GP_AO" in df.columns else "Hip_x_ao"
+    ao_phase = np.asarray(df[ao_col].values)
 
     # Bandpass filter to remove noise and DC offset
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
@@ -64,7 +65,8 @@ def visualize(input_path, fs=SAMPLING_FREQ, threshold=None):
 
     t = pd.to_datetime(df["Time"], format="%H:%M:%S.%f")
     raw_hip_angle = np.asarray(df["Hip_x"].values)
-    ao_raw_phase = np.asarray(df["GP_AO"].values)
+    ao_col = "GP_AO" if "GP_AO" in df.columns else "Hip_x_ao"
+    ao_raw_phase = np.asarray(df[ao_col].values)
     filtered_hip = bandpass_filter(raw_hip_angle, fs)
     aligned_phase, amplitude, used_threshold = align_ao_phase(
         filtered_hip, ao_raw_phase, threshold=threshold

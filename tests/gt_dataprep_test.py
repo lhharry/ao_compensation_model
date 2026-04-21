@@ -14,7 +14,8 @@ def _make_raw_csv(path: Path, n: int = 500) -> None:
     """Write a minimal raw CSV that prepare_targets can consume."""
     t = np.arange(n)
     hip_x = 10 * np.sin(2 * np.pi * t / 100)  # ~1 Hz gait cycle at fs=100
-    ao_phase = np.linspace(0, 2 * np.pi * 5, n)
+    # Wrapped AO phase in [-pi, pi] so peak-based alignment has valid maxima.
+    ao_phase = np.mod(2 * np.pi * t / 100 + 0.5, 2 * np.pi) - np.pi
     times = pd.date_range("17:00:00", periods=n, freq="10ms").strftime("%H:%M:%S.%f")
     df = pd.DataFrame({"Time": times, "Hip_x": hip_x, "Hip_x_ao": ao_phase})
     df.to_csv(path, index=False, sep=";")

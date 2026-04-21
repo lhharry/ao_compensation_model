@@ -37,10 +37,10 @@ def test_build_gru_model_output_shape():
     n_features = 2
     model = build_gru_model(WINDOW_SIZE, n_features)
     assert model.input_shape == (None, WINDOW_SIZE, n_features)
-    assert model.output_shape == (None, 2)
+    assert model.output_shape == (None, WINDOW_SIZE, 2)
 
 
 def test_build_gru_model_with_batch_size():
     """GRU model with fixed batch_size=1 should compile."""
     model = build_gru_model(WINDOW_SIZE, 2, batch_size=1)
-    assert model.output_shape == (1, 2)
+    assert model.output_shape == (1, WINDOW_SIZE, 2)
