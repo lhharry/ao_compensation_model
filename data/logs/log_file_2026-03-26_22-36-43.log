@@ -1,4 +1,0 @@
-2026-03-26 22:36:43.107 | INFO     | ao_compensation_model.utils:setup_logger:421 - Logging to 'data\logs\log_file_2026-03-26_22-36-43.log'.
-2026-03-26 22:36:44.637 | INFO     | ao_compensation_model.app:_run_validate:59 - Running validation on test data...
-2026-03-26 22:36:44.638 | INFO     | ao_compensation_model.app:_run_validate:61 -   Validating: yang.csv
-2026-03-26 22:39:01.952 | SUCCESS  | ao_compensation_model.app:_run_validate:63 - Validation complete.

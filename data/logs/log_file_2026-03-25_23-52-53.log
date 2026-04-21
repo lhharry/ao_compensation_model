@@ -1,3 +1,0 @@
-2026-03-25 23:52:53.920 | INFO     | ao_compensation_model.utils:setup_logger:421 - Logging to 'data\logs\log_file_2026-03-25_23-52-53.log'.
-2026-03-25 23:53:04.574 | INFO     | ao_compensation_model.app:_run_train:41 - Starting GRU training pipeline...
-2026-03-25 23:53:04.575 | WARNING  | ao_compensation_model.training_search:setup_gpu:68 - No compatible GPU found. TensorFlow will fall back to CPU for training.
