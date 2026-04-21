@@ -1,26 +1,26 @@
-import math
+"""Run streaming validation with the exported TFLite model."""
+
 import os
+
 import joblib
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+from collections import deque
 from pathlib import Path
 
+import ai_edge_litert.interpreter as tflite
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from collections import deque
 
-import ai_edge_litert.interpreter as tflite
-from ao_compensation_model.definitions import (
-    TEST_DATA_DIR,
-    WINDOW_SIZE
-)
+from ao_compensation_model.definitions import TEST_DATA_DIR, WINDOW_SIZE
 
 fs = 100 # Sampling frequency (Hz)
 dt = 1 / fs
 script_dir = Path(__file__).resolve().parent
-path = 'model\\2026_03_26_22_54_0.0713'
-model_path= os.path.join(script_dir, path, 'gru_model_edge.tflite')
-scaler_path = os.path.join(script_dir, path,'scaler.pkl')
+path = "model\\2026_03_26_22_54_0.0713"
+model_path= os.path.join(script_dir, path, "gru_model_edge.tflite")
+scaler_path = os.path.join(script_dir, path,"scaler.pkl")
 
 _stream_state = {
     "model": None,
@@ -41,6 +41,7 @@ def _as_scalar(value):
 
 def load_test_data(csv_path: Path) -> dict[str, np.ndarray]:
     """Read a test CSV and return raw column arrays as a dictionary.
+
     :param csv_path: Full path to the test CSV file.
     :return: Dictionary mapping column names to numpy arrays.
     """
@@ -51,6 +52,7 @@ def load_test_data(csv_path: Path) -> dict[str, np.ndarray]:
     }
 
 def data_preparation(raw_hip_angle_left, input_velocity):
+    """Scale inputs and update the streaming feature buffer."""
     raw_hip_angle_left = _as_scalar(raw_hip_angle_left)
     input_velocity = _as_scalar(input_velocity)
 
@@ -67,6 +69,7 @@ def data_preparation(raw_hip_angle_left, input_velocity):
 # 2. Load Model
 # -----------------------------------------------------------------
 def build_model():
+    """Create and initialize the TFLite interpreter."""
     interpreter = tflite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
     return interpreter
@@ -75,29 +78,15 @@ def build_model():
 # 5. Inference & Alignment
 # -----------------------------------------------------------------
 def model_inference(model, input_angle, alpha=0.1):
+    """Run one inference step and return phase plus sine/cosine outputs."""
     input_details = model.get_input_details()
     output_details = model.get_output_details()
-    model.set_tensor(input_details[0]['index'], input_angle)
+    model.set_tensor(input_details[0]["index"], input_angle)
     model.invoke()
-    y_pred = model.get_tensor(output_details[0]['index'])[0]
+    y_pred = model.get_tensor(output_details[0]["index"])[0]
     pred_sin = y_pred[-1][0]
     pred_cos = y_pred[-1][1]
     predicted_phase = np.arctan2(pred_sin, pred_cos)
-    
-    # raw_sin = y_pred[-1][0]
-    # raw_cos = y_pred[-1][1]
-    
-    # # Apply Exponential Moving Average (EMA) filter
-    # if _stream_state["filtered_sin"] is None:
-    #     _stream_state["filtered_sin"] = raw_sin
-    #     _stream_state["filtered_cos"] = raw_cos
-    # else:
-    #     _stream_state["filtered_sin"] = alpha * raw_sin + (1.0 - alpha) * _stream_state["filtered_sin"]
-    #     _stream_state["filtered_cos"] = alpha * raw_cos + (1.0 - alpha) * _stream_state["filtered_cos"]
-        
-    # pred_sin = _stream_state["filtered_sin"]
-    # pred_cos = _stream_state["filtered_cos"]
-    # predicted_phase = np.arctan2(pred_sin, pred_cos)
     return float(predicted_phase), float(pred_sin), float(pred_cos)
 
 
@@ -122,7 +111,7 @@ def predict_sequence(input_angle, input_velocity) -> np.ndarray:
     """Run streaming prediction over full sequences and return predicted phase."""
     reset_stream_state()
     preds = []
-    for angle_i, velocity_i in zip(input_angle, input_velocity):
+    for angle_i, velocity_i in zip(input_angle, input_velocity, strict=False):
         preds.append(load_model(angle_i, velocity_i))
     return np.asarray(preds, dtype=np.float32)
 

@@ -10,8 +10,8 @@ from datetime import date
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
-from pathlib import Path
 import random
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -24,27 +24,37 @@ from tensorflow.keras.callbacks import (
     ModelCheckpoint,
     ReduceLROnPlateau,
 )
-from tensorflow.keras.layers import GRU, Dense, Input, UnitNormalization, Conv1D, BatchNormalization, AveragePooling1D, ZeroPadding1D
+from tensorflow.keras.layers import (
+    GRU,
+    AveragePooling1D,
+    BatchNormalization,
+    Conv1D,
+    Dense,
+    Input,
+    UnitNormalization,
+    ZeroPadding1D,
+)
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
 
 from ao_compensation_model.definitions import (
+    BATCH_SIZE,
     DROPOUT_RATE,
+    FILTERS,
+    GRU_UNITS,
+    KERNEL_SIZE,
     LEARNING_RATE,
     MAX_EPOCHS,
     MODEL_DIR,
+    POOL_SIZE,
+    STRIDE,
     TARGET_LEAD,
     TRAINING_DATA_DIR,
     WINDOW_SIZE,
-    STRIDE,
-    KERNEL_SIZE,
-    FILTERS,
-    POOL_SIZE,
-    BATCH_SIZE,
-    GRU_UNITS,
 )
 from ao_compensation_model.utils import create_sliding_windows, setup_logger
+
 
 def set_seed(seed: int = 42):
     """Set global random seeds for exact reproducibility."""
@@ -52,18 +62,18 @@ def set_seed(seed: int = 42):
     np.random.seed(seed)
     tf.random.set_seed(seed)
 
-    os.environ['TF_DETERMINISTIC_OPS'] = '1'
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["TF_DETERMINISTIC_OPS"] = "1"
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 def setup_gpu():
     """Configure TensorFlow to use the GPU with dynamic memory allocation."""
-    gpus = tf.config.list_physical_devices('GPU')
+    gpus = tf.config.list_physical_devices("GPU")
     if gpus:
         try:
             # Enable memory growth so TF doesn't hoard all VRAM at startup
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
-            logical_gpus = tf.config.list_logical_devices('GPU')
+            logical_gpus = tf.config.list_logical_devices("GPU")
             logger.info(f"Successfully configured GPU. {len(gpus)} Physical GPUs, {len(logical_gpus)} Logical GPUs available.")
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
@@ -90,21 +100,21 @@ def preprocess_one_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     return features, targets
 
 def continuity_mse_loss(lambda_smooth=2.0):
-    """
-    Custom loss function combining MSE and a temporal smoothness penalty.
+    """Combine MSE with a temporal smoothness penalty.
+
     :param lambda_smooth: Weight of the smoothness penalty. Higher = smoother.
     """
     def loss(y_true, y_pred):
         # 1. Standard Mean Squared Error (Accuracy)
         mse = tf.reduce_mean(tf.square(y_true - y_pred))
-        
+
         # 2. Smoothness Penalty (Continuity)
         # Calculate the difference between consecutive time steps in the prediction
         # y_pred shape: (batch_size, window_size, 2)
         diff1 = y_pred[:, 1:, :] - y_pred[:, :-1, :]
         diff2 = diff1[:, 1:, :] - diff1[:, :-1, :]
         smoothness_penalty = tf.reduce_mean(tf.square(diff2)) + tf.reduce_mean(tf.square(diff1))
-        
+
         return mse + lambda_smooth * smoothness_penalty
 
     return loss
@@ -121,7 +131,7 @@ def build_gru_model(
     :return: Keras Model (uncompiled).
     """
     inp = Input(shape=(window_size, n_features), batch_size=batch_size)
-    
+
     x_filter = Conv1D(filters=FILTERS, kernel_size=KERNEL_SIZE, padding="causal", activation="linear")(inp)
     x_norm = BatchNormalization()(x_filter)
     x_padded = ZeroPadding1D(padding=(POOL_SIZE - 1, 0))(x_norm)
@@ -136,6 +146,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
     """Log validation loss after every epoch."""
 
     def on_train_begin(self, logs=None):
+        """Log the start of training and the configured hyperparameters."""
         logger.info("Training started.")
         logger.info(
             "Hyperparameters:\n"
@@ -155,6 +166,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
         )
 
     def on_epoch_end(self, epoch, logs=None):
+        """Log the validation loss at the end of each epoch."""
         logs = logs or {}
         logger.info(
             "Epoch {:3d} | val_loss: {:.6f}",
@@ -162,7 +174,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
             logs.get("val_loss", float("nan")),
         )
 
-def train():
+def train():  # noqa: PLR0915
     """Run the full training pipeline: load data, train, and export TFLite."""
     setup_gpu()
     set_seed(42)
@@ -183,7 +195,7 @@ def train():
         file_data.append((csv_file.name, features, targets))
 
     # --- File-level train/val split to prevent data leakage ---
-    val_subjects = {"3km"} 
+    val_subjects = {"3km"}
 
     # --- Fit scaler on training files  ---
     train_features_for_fit = np.vstack(
@@ -198,7 +210,7 @@ def train():
     x_train_list, y_train_list = [], []
     x_val_list, y_val_list = [], []
 
-    for i, (name, features, targets) in enumerate(file_data):
+    for i, (_name, features, targets) in enumerate(file_data):
         features_scaled = np.asarray(scaler.transform(features))
         x_file, y_file = create_sliding_windows(features_scaled, targets, WINDOW_SIZE, STRIDE, TARGET_LEAD)
         if len(x_file) == 0:
@@ -229,7 +241,7 @@ def train():
     idx = np.random.permutation(len(x_train))
     x_train, y_train = x_train[idx], y_train[idx]
 
-    y_train_phase = y_train[:, :, :2]         
+    y_train_phase = y_train[:, :, :2]
     y_val_phase = y_val[:, :, :2]
 
     model = build_gru_model(WINDOW_SIZE, x_train.shape[2],batch_size=BATCH_SIZE)
@@ -257,7 +269,7 @@ def train():
         ModelCheckpoint(filepath=str(model_path), monitor="val_loss", save_best_only=True, verbose=1),
         EpochLogger(),
     ]
-    
+
     history = model.fit(
         x_train,
         y_train_phase,
@@ -271,8 +283,8 @@ def train():
     best_val_loss = min(history.history["val_loss"])
     best_model_path = MODEL_DIR / f"{today_str}_{time_str}_{best_val_loss:.4f}"
     os.makedirs(best_model_path)
-    best_model = best_model_path/ f"gru_model.keras"
-    tflite_path = best_model_path / f"gru_model_edge.tflite"
+    best_model = best_model_path/ "gru_model.keras"
+    tflite_path = best_model_path / "gru_model_edge.tflite"
 
     if model_path.exists():
         model_path.rename(best_model)

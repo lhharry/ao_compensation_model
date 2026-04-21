@@ -123,7 +123,7 @@ def test_align_ao_phase_output_shape():
     filtered = bandpass_filter(signal, fs=fs)
     # Simulate an AO phase that wraps around [-pi, pi]
     ao_phase = np.mod(2 * np.pi * 1.0 * t + 0.5, 2 * np.pi) - np.pi
-    aligned, amplitude, used_thr = align_ao_phase(filtered, ao_phase, dt=1 / fs)
+    aligned, amplitude, _used_thr = align_ao_phase(filtered, ao_phase, dt=1 / fs)
     assert aligned.shape == filtered.shape
     assert amplitude.shape == filtered.shape
 

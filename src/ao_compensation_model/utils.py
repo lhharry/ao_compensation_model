@@ -1,3 +1,4 @@
+# ruff: noqa: C901, PLR0912, PLR0913
 """Utility functions for signal processing, data preparation, and logging."""
 
 import sys
@@ -354,7 +355,6 @@ def generate_gru_targets(
     :param tp_sin: Sine of the true phase.
     :return: Array of shape (N, 2) with columns [target_cos, target_sin].
     """
-
     target_cos = tp_cos
     target_sin = tp_sin
     return np.column_stack([target_cos, target_sin])
@@ -371,6 +371,7 @@ def create_sliding_windows(
     stride: int = 1,
     target_lead: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Build overlapping sliding windows from data and target arrays."""
     x_windows, y_windows = [], []
     for i in range(0, len(data) - window_size - target_lead, stride):
         x_windows.append(data[i : i + window_size])
