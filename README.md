@@ -112,7 +112,7 @@ Pushing a version tag triggers automatic publishing to PyPI via GitHub Actions (
 
 ```bash
 # Update version in pyproject.toml, then:
-git tag v0.1.1
+git tag v0.x.x
 git push origin --tags
 ```
 

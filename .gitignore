@@ -169,7 +169,8 @@ cython_debug/
 .pixi
 *.egg-info
 
+# data files and archives
 src/ao_compensation_model/dataset/raw
 src/ao_compensation_model/dataset/archive
-
+data/
 archive/
