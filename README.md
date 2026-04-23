@@ -6,6 +6,16 @@
 
 A GRU-based compensation model that improves the performance of adaptive oscillators (AOs) during stop-go and go-stop gait transitions. The model learns the phase error between the AO output and the ground-truth gait phase, and applies a real-time correction on edge devices via TFLite.
 
+## Data Acquisition
+
+The training data was collected using three walking protocols:
+
+1. Steady-state treadmill walking at 3, 4, and 5 km/h, with each speed recorded for 5 minutes.
+2. Dynamic treadmill transitions at 4 km/h, using 30-second walking bursts separated by rest periods of 10, 5, and 3 seconds. The full sequence was repeated twice to capture rapid stop-go changes.
+3. Overground stop-go walking, consisting of exactly 10 steps on level ground followed by standing breaks of 10, 5, and 3 seconds. This sequence was repeated four times.
+
+After acquisition, run `prep` to convert the raw recordings into training-ready CSV files. Before training, quickly review the processed output to make sure the auto-generated targets and phase traces remain smooth and do not contain sudden jumps.
+
 ## Pipeline
 
 | Step | Command | Description |
